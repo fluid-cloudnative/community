@@ -165,7 +165,7 @@ vi pkg/ddc/jindo/engine.go
 这里涉及到两个问题： 
 
 	1.如何初始化Engine，初始化Engine的方式可以参考`pkg/ddc/alluxio/engine.go`中的Build方法, 并且需要注册到`pkg/ddc/factory.go`  
-	2.Engine的生命周期管理
+	2.Engine的生命周期管理, 以下定义了需要实现的相关函数
 
 
 5.2. 其中需要实现的接口Implement定义在`pkg/ddc/base/engine.go`, 具体需要实现的方法如下。
@@ -234,8 +234,9 @@ type UnderFileSystemService interface {
 
 ```
 
+5.3. Engine的整体生命周期分为初始化
 
-
+     Engine.Setup -> Engine.CreateVolume -> Engine.Sync
 
 
 
