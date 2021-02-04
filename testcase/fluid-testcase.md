@@ -2,27 +2,27 @@
 
 ## 目录
 
-- [1. 安装fluid](#1. 安装fluid)
+- [1.安装fluid](#1.安装fluid)
   - [获得最新的fluid项目](#获得最新的fluid项目)
     - [无fluid仓库](#无fluid仓库)
     - [有fluid仓库](#有fluid仓库)
   - [卸载旧版本的fluid](#卸载旧版本的fluid)
   - [安装fluid](#安装fluid)
   - [检查fluid运行状态](#检查fluid运行状态)
-- [2. 创建Dataset](#2. 创建Dataset)
+- [2.创建Dataset](#2.创建Dataset)
   - [创建Dataset对应的yaml文件](#创建Dataset对应的yaml文件)
   - [创建Dataset](#创建Dataset)
-- [3. 创建AlluxioRuntime](#3. 创建AlluxioRuntime)
+- [3.创建AlluxioRuntime](#3.创建AlluxioRuntime)
   - [创建AlluxioRuntime对应的yaml文件](#创建AlluxioRuntime对应的yaml文件)
   - [创建AlluxioRuntime](#创建AlluxioRuntime)
   - [检查AlluxioRuntime对应的pod是否正常运行](#检查AlluxioRuntime对应的pod是否正常运行)
-- [4. 判断Dataset是否bound](#4. 判断Dataset是否bound)
+- [4.判断Dataset是否bound](#4.判断Dataset是否bound)
   - [检查AlluxioRuntime是否Ready](#检查AlluxioRuntime是否Ready)
   - [检查Dataset是否bound](#检查Dataset是否bound)
-- [5. 删除Dataset](#5. 删除Dataset)
-- [6. 删除AlluxioRuntime](#6. 删除AlluxioRuntime)
+- [5.删除Dataset](#5.删除Dataset)
+- [6.删除AlluxioRuntime](#6.删除AlluxioRuntime)
 
-## 1. 安装fluid
+## 1.安装fluid
 
 ### 获得最新的fluid项目
 
@@ -119,7 +119,7 @@ kubectl get pod -n fluid-system | grep csi-nodeplugin | awk '{print $3}'
 
 如果以上结果返回都正确，说明fluid在正常运行。
 
-## 2. 创建Dataset
+## 2.创建Dataset
 
 该节展示了如何创建一个Dataset，以名字为spark的Dataset为例。
 
@@ -152,7 +152,7 @@ kubectl create -f dataset.yaml
 kubectl get dataset | awk '{print $1}' | grep ^spark$
 ```
 
-## 3. 创建AlluxioRuntime
+## 3.创建AlluxioRuntime
 
 该节展示了如何创建Dataset对应的AlluxioRuntime，同样以spark为例。
 
@@ -222,7 +222,7 @@ kubectl get pod | grep spark-fuse | awk '{print $3}'
 
 如果以上条件都满足，说明AlluxioRuntime正常运行。
 
-## 4. 判断Dataset是否bound
+## 4.判断Dataset是否bound
 
 ### 检查AlluxioRuntime是否Ready
 
@@ -254,7 +254,7 @@ kubectl get alluxioruntime | awk '$1=="spark"{print $4}'
 kubectl get dataset | awk '$1=="spark"{print $6}'
 ```
 
-## 5. 删除Dataset
+## 5.删除Dataset
 
 输入以下命令删除Dataset。
 
@@ -274,7 +274,7 @@ kubectl get dataset | awk '$1=="spark"'
 kubectl get alluxioruntime | awk '$1=="spark"'
 ```
 
-## 6. 删除AlluxioRuntime
+## 6.删除AlluxioRuntime
 
 输入以下命令删除AlluxioRuntime。
 
