@@ -16,11 +16,18 @@
   - [创建AlluxioRuntime对应的yaml文件](#创建AlluxioRuntime对应的yaml文件)
   - [创建AlluxioRuntime](#创建AlluxioRuntime)
   - [检查AlluxioRuntime对应的pod是否正常运行](#检查AlluxioRuntime对应的pod是否正常运行)
+  - [检查PV和PVC是否正常创建](#检查PV和PVC是否正常创建)
 - [4.判断Dataset是否bound](#4.判断Dataset是否bound)
   - [检查AlluxioRuntime是否Ready](#检查AlluxioRuntime是否Ready)
   - [检查Dataset是否bound](#检查Dataset是否bound)
 - [5.删除Dataset](#5.删除Dataset)
 - [6.删除AlluxioRuntime](#6.删除AlluxioRuntime)
+- [7.DataLoad数据预加载](#7.DataLoad数据预加载)
+  - [创建DataLoad对应的yaml文件](#创建DataLoad对应的yaml文件)
+  - [创建DataLoad](#创建DataLoad)
+  - [检查DataLoad是否已经正常运行](#检查DataLoad是否已经正常运行)
+  - [检查DataLoad是否执行成功](#检查DataLoad是否执行成功)
+  - [删除DataLoad](#删除DataLoad)
 
 ## 1.安装fluid
 
@@ -125,6 +132,8 @@ kubectl get pod -n fluid-system | grep csi-nodeplugin | awk '{print $3}'
 
 ### 创建Dataset对应的yaml文件
 
+dataset.yaml文件的内容可以根据需要进行编辑。
+
 ```shell
 cat << EOF > dataset.yaml
 apiVersion: data.fluid.io/v1alpha1
@@ -157,6 +166,8 @@ kubectl get dataset | awk '{print $1}' | grep ^spark$
 该节展示了如何创建Dataset对应的AlluxioRuntime，同样以spark为例。
 
 ### 创建AlluxioRuntime对应的yaml文件
+
+runtime.yaml文件的内容可以根据需要进行编辑。
 
 ```shell
 cat << EOF > runtime.yaml 
@@ -202,7 +213,7 @@ kubectl get alluxioruntime | awk '{print $1}' | grep ^spark$
 
 ### 检查AlluxioRuntime对应的pod是否正常运行
 
-查看master，输入以下命令，如果master正常运行，返回`Running`
+查看master，输入以下命令，如果master正常运行，返回`Running`。
 
 ```shell
 kubectl get pod | grep spark-master | awk '{print $3}'
@@ -221,6 +232,22 @@ kubectl get pod | grep spark-fuse | awk '{print $3}'
 ```
 
 如果以上条件都满足，说明AlluxioRuntime正常运行。
+
+### 检查PV和PVC是否正常创建
+
+查看PV是否正常创建，输入以下命令，如果PV正常创建，返回`Bound`。
+
+```shell
+kubectl get pv | awk '$1=="spark" && $7=="fluid" {print $5}'
+```
+
+查看PVC是否正常创建，输入以下命令，如果PVC正常创建，返回`Bound`。
+
+```shell
+kubectl get pvc | awk '$1=="spark" && $3=="spark" && $6=="fluid" {print $2}'
+```
+
+如果以上条件都满足，说明fluid成功创建了PV和PVC。
 
 ## 4.判断Dataset是否bound
 
@@ -262,13 +289,13 @@ kubectl get dataset | awk '$1=="spark"{print $6}'
 kubectl delete dataset spark
 ```
 
-检查Dataset是否被删除，输入以下命令输出空。
+检查Dataset是否被删除，输入以下命令输出空或者`No resources found in default namespace.`。
 
 ```shell
 kubectl get dataset | awk '$1=="spark"'
 ```
 
-检查AlluxioRuntime是否被删除，输入以下命令输出空。
+检查AlluxioRuntime是否被删除，输入以下命令输出空或者`No resources found in default namespace.`。
 
 ```shell
 kubectl get alluxioruntime | awk '$1=="spark"'
@@ -282,8 +309,114 @@ kubectl get alluxioruntime | awk '$1=="spark"'
 kubectl delete alluxioruntime spark
 ```
 
-检查AlluxioRuntime是否被删除，输入以下命令输出空。
+检查AlluxioRuntime是否被删除，输入以下命令输出空或者`No resources found in default namespace.`。
 
 ```shell
 kubectl get alluxioruntime | awk '$1=="spark"'
 ```
+
+## 7.DataLoad数据预加载
+
+本节展示了如何借助DataLoad进行数据预加载，同样以spark数据集为例。首先创建好相应的Dataset和AlluxioRuntime。
+
+1. [创建Dataset](#2.创建Dataset)
+
+2. [创建AlluxioRuntime](#3.创建AlluxioRuntime)
+
+3. [判断Dataset是否bound](#4.判断Dataset是否bound)
+
+> 需要注意的是，创建DataLoad进行数据预加载并不需要Dataset处于bound的状态，这里多一步判断Dataset是否bound只是可以为后续出错排查提供方便。
+
+### 创建DataLoad对应的yaml文件
+
+```shell
+cat << EOF > dataload.yaml
+apiVersion: data.fluid.io/v1alpha1
+kind: DataLoad
+metadata:
+  name: spark-dataload
+spec:
+  dataset:
+    name: spark
+    namespace: default
+EOF
+```
+
+### 创建DataLoad
+
+输入以下命令创建DataLoad。
+
+```shell
+kubectl create -f dataload.yaml
+```
+
+检查DataLoad是否成功创建，如果创建成功，输入以下命令输出DataLoad的名字`spark-dataload`。
+
+```shell
+kubectl get dataload | awk '{print $1}' | grep ^spark-dataload$
+```
+
+### 检查DataLoad是否已经正常运行
+
+检查DataLoad是否已经创建Job，成功创建Job输入以下命令输出不为空。
+
+```shell
+kubectl get job | awk '$1=="spark-dataload-loader-job"'
+```
+
+检查DataLoad对应的Pod的状态，正常运行应该返回`Running`。
+
+```shell
+kubectl get pod | grep ^spark-dataload-loader | awk '{print $3}'
+```
+
+检查DataLoad是否已经开始运行，输入以下命令返回`Pending`或者`Loading`，如果Dataset的size很小的话，加载数据操作会很快完成，也有可能返回`Complete`或者`Failed`，出现以上几种状态之一都能够说明DataLoad已经在正常运行了。
+
+```shell
+kubectl get dataload | awk '$1=="spark-dataload" {print $3}'
+```
+
+### 检查DataLoad是否执行成功
+
+检查DataLoad创建的Job的状态，执行成功，输入以下命令返回`Complete`，执行失败，返回`Failed`。如果Job未执行结束，返回空。
+
+```shell
+kubectl get job spark-dataload-loader-job -o jsonpath={.status.conditions[0].type}
+```
+
+检查DataLoad是否执行成功，如果执行成功，输入以下命令返回`Complete`，如果失败，返回`Failed`。如果DataLoad未结束，输出`Pending`或者`Loading`。
+
+```shell
+kubectl get dataload | awk '$1=="spark-dataload" {print $3}'
+```
+
+检查Dataset的数据是否被缓存，输入以下命令返回缓存比例，正常情况下，在有缓存能力的情况下，缓存比例应该大于0。本例中，DataLoad执行结束后输出`100.0%`。
+
+```shell
+kubectl get dataset | awk '$1=="spark" {print $5}'
+```
+
+如果以上命令都是成功状态，说明DataLoad执行成功且正常加载了数据，否则说明加载数据失败。
+
+### 删除DataLoad
+
+输入以下命令删除DataLoad。
+
+```shell
+kubectl delete dataload spark-dataload
+```
+
+检查DataLoad是否删除，如果DataLoad已经正常删除，输入以下命令输出为空或者`No resources found in default namespace.`。
+
+```shell
+kubectl get dataload | awk '$1=="spark-dataload"'
+```
+
+检查DataLoad创建的Job是否删除，如果DataLoad已经正常删除，输入以下命令输出为空或者`No resources found in default namespace.`。
+
+```shell
+kubectl get job | awk '{print $1}' | grep ^spark-dataload-loader-job
+```
+
+如果以上条件都满足，说明DataLoad已经成功删除。需要注意的是，当DataLoad对应的Dataset删除之后，DataLoad会被级联删除。
+
