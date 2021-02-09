@@ -33,7 +33,7 @@
     - [删除历史备份记录-local](#删除历史备份记录-local)
     - [创建DataBackup对应的yaml文件-local](#创建DataBackup对应的yaml文件-local)
     - [创建DataBackup-local](#创建DataBackup-local)
-    - [检查DataBackup是否执行成功-local](#检查DataBackup是否执行成功local)
+    - [检查DataBackup是否执行成功-local](#检查DataBackup是否执行成功-local)
   - [备份到PVC](#备份到PVC)
     - [创建PV和PVC](#创建PV和PVC)
     - [删除历史备份记录-pvc](#删除历史备份记录-pvc)
