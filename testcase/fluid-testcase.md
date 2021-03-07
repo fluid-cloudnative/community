@@ -41,7 +41,12 @@
     - [创建DataBackup-pvc](#创建DataBackup-pvc)
     - [检查DataBackup是否执行成功-pvc](#检查DataBackup是否执行成功-pvc)
   - [删除DataBackup](#删除DataBackup)
-
+  - [9.Fuse客户端全局部署模式下扩容AlluxioRuntime](#Fuse客户端全局部署模式下扩容AlluxioRuntime)
+    - [查看节点信息](#查看节点信息)
+    - [创建Dataset](#创建Dataset)
+    - [创建AlluxioRuntime](#创建AlluxioRuntime)
+    - [查看alluxio-worker所在节点](#查看alluxio-worker所在节点)
+    - [扩容AlluxioRuntime](#扩容AlluxioRuntime)
 ## 1-安装fluid
 
 ### 获得最新的fluid项目
@@ -674,5 +679,137 @@ kubectl delete databackup spark-backup-local
 kubectl get databackup | awk '$1=="spark-backup-local"'
 ```
 
+## Fuse客户端全局部署模式下扩容AlluxioRuntime
+
+### 查看节点信息
+
+查看集群中有哪些节点：
+
+```shell
+kubectl get nodes
+```
+
+本测试用例需要至少5个节点才能完成测试。下面将分别称呼它们为node1~node5。
+
+为node1~node4打上标签：
+
+```shell
+kubectl label node <nodeName> fuse=true
+```
+
+### 创建Dataset
+
+检查待创建的Dataset对象：
+
+```shell
+$ cat<<EOF >dataset.yaml
+apiVersion: data.fluid.io/v1alpha1
+kind: Dataset
+metadata:
+  name: hbase
+spec:
+  mounts:
+    - mountPoint: https://mirrors.tuna.tsinghua.edu.cn/apache/hbase/stable/
+      name: hbase
+EOF
+```
+
+创建Dataset：
+
+```shell
+kubectl create -f dataset.yaml
+```
+
+## 创建AlluxioRuntime
+
+检查待创建的AlluxioRuntime对象：
+
+```
+cat<<EOF >runtime-node-selector.yaml
+apiVersion: data.fluid.io/v1alpha1
+kind: AlluxioRuntime
+metadata:
+  name: hbase
+spec:
+  replicas: 1
+  tieredstore:
+    levels:
+      - mediumtype: MEM
+        path: /dev/shm
+        quota: 2Gi
+        high: "0.95"
+        low: "0.7"
+  properties:
+    alluxio.user.block.size.bytes.default: 256MB
+    alluxio.user.streaming.reader.chunk.size.bytes: 256MB
+    alluxio.user.local.reader.chunk.size.bytes: 256MB
+    alluxio.worker.network.reader.buffer.size: 256MB
+    alluxio.user.streaming.data.timeout: 300sec
+  fuse:
+    global: true
+    nodeSelector:
+      fuse: true
+    args:
+      - fuse
+      - --fuse-opts=kernel_cache,ro,max_read=131072,attr_timeout=7200,entry_timeout=7200,nonempty,max_readahead=0
+EOF
+```
+该配置文件中，fuse设置为了全局模式，fuse客户端会运行在刚刚打了标签的node1~node4上。
+
+创建AlluxioRuntime：
+
+```shell
+kubectl create -f runtime.yaml
+```
+
+### 查看alluxio-worker所在节点
+
+查看该Dataset对应的alluxio-worker所在节点：
+
+```shell
+kubectl get pod -o custom-columns=NAME:metadata.name,NAME:.spec.nodeName | grep hbase-worker
+```
+
+目前应该只有1副本，假设它所在的节点是node1。
+
+### 创建Nginx容器
+
+检查待创建的Pod对象：
+
+```shell
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+spec:
+  containers:
+    - name: nginx
+      image: nginx
+      volumeMounts:
+        - mountPath: /data
+          name: hbasevol
+  nodeSelector:
+    kubernetes.io/hostname: <nodeName>
+  volumes:
+    - name: hbasevol
+      persistentVolumeClaim:
+        claimName: hbase
+```
+
+这样的Pod需要创建3个，前两个的hostname指定为node2，第三个的hostname指定为node3。
+
+这样，node2~4上将分别有2、1、0个正在使用该数据集的Pod。
+
+### 扩容AlluxioRuntime
+
+修改AlluxioRuntime的.spec.replicas，依次修改为2~5。
+
+每次修改后，都再次查看该Dataset对应的alluxio-worker所在节点：
+
+```shell
+kubectl get pod -o custom-columns=NAME:metadata.name,NAME:.spec.nodeName | grep hbase-worker
+```
+
+可以看到，新建的alluxio-worker将依次被调度到node2~5。
 
 
