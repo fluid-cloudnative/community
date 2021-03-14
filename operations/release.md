@@ -23,7 +23,7 @@ git checkout -b update_readme_release
 ```
 
 3. 更新文档
-
+“What is NEW!”in $FLUID_HOME/ReadMe.md (both CN and EN), vedio link(optional);
 
 4. 提交代码
 
