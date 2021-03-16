@@ -71,7 +71,7 @@ Successfully packaged chart and saved it to: fluid-master/charts/fluid/fluid-0.5
 ### 3. 发布Release，并且编写Release Note, 上传package
 
 
-1. 登录https://github.com/fluid-cloudnative/fluid/releases， 点击 `Draft a new release`
+1. 登录https://github.com/fluid-cloudnative/fluid/releases 点击 `Draft a new release`
 
 选择v0.5.0, 并且填写markdown
 
