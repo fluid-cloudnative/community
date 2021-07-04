@@ -34,7 +34,7 @@ Fluid本身的开发由社区驱动，一方面需要加强社区方向的引导
 Reviewer要求：  
 - 至少有一个Toc成员  
 - 最低signoff人数是3人。小于3人需要Toc批准。signoff人数不设上限。  
-- Toc有权要求增加reviewer。| Doc owner+Toc | 除特殊情况，doc owner不能是reviewer。 |
+- Toc有权要求增加reviewer。| Doc owner+Toc | 除特殊情况，doc owner不能是reviewer。 | ||
 | 3 Design review  
 1）Doc owner在钉钉群“Fluid研发**Design Review**工作群”中@具体的reviewer，附上doc link。  
 2）Online doc review：Reviewer确保在**7天内完成**。  
