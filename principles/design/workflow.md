@@ -1,4 +1,6 @@
-01 Design Review组织架构和流程
+# Design Review组织架构和流程
+
+# 一 为什么需要Design Review
 
 Fluid本身的开发由社区驱动，一方面需要加强社区方向的引导和梳理，一方面需要社区成员加强协同争取一次把事情做对。随着软件不断迭代，生产环境部署越来越多，我们偿还技术债务的成本会越来越高。在过去的研发过程中，我们经常会遇到如下问题：
 
@@ -15,7 +17,7 @@ Fluid本身的开发由社区驱动，一方面需要加强社区方向的引导
 
 另外从个人成长来看，撰写高质量结构化的设计文档是职业发展甚至晋升的必要素质之一。
 ​
-# 二 Design Review Committee
+## 二 Design Review Committee
 #### Steering Committee
 成员：Toc成员
 职责：对整 Design review模版/流程有最终解释权
@@ -31,7 +33,7 @@ Fluid本身的开发由社区驱动，一方面需要加强社区方向的引导
 [design doc template](template.md) |
 | 2、确定Reviewers
 Reviewer要求：
-- 至少有一个Toc
+- 至少有一个Toc成员
 - 最低signoff人数是3人。小于3人需要Toc批准。signoff人数不设上限。
 - Toc有权要求增加reviewer。
 
@@ -43,7 +45,7 @@ Reviewer要求：
 3）Meeting评审：如果online doc review无法达成共识，则doc owner发起会议评审，前提是各reviwer已经把意见反馈到doc文档的comment区域。
 4）Signoff：每一个reviewer都需要最终表态这个设计方案是否通过/打回。 | Reviewers | 如果能够通过在线review完成，则不需要开会；如果需要会议review，具体形式由doc owner和reviewers商议决定。 |
 
-# FAQ
+## FAQ
 
 问：什么粒度的方案需要发 Design Review？
 答：以下两类情况必须发 Design Review：
