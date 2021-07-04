@@ -7,25 +7,16 @@ Owner:
 
 | Reviewer | Signoff | Date |
 | --- | --- | --- |
-| [@Rong)](/r.gu) | LGTM | ​
- |
-|  |  |  |
-|  |  |  |
+| [@Rong](/r.gu) | LGTM | ​
 
 
 
-(optional)
 
 | 版本号 | 作者 | 内容提要 | 发布日期 |
 | --- | --- | --- | --- |
-| 0.1 | ​
- | 文档建立 | ​
- |
-| 0.2 |  | 根据reviewer意见xxxx做了第一轮修改 | ​
- |
-| 0.3 | ​
- | 根据reviewer意见xxxx做了第二轮修改 | ​
- |
+| 0.1 | ​| 文档建立 | ​| |
+| 0.2 |  | 根据reviewer意见xxxx做了第一轮修改 | ​ |
+| 0.3 | ​ | 根据reviewer意见xxxx做了第二轮修改 | ​ |
 
 
 
