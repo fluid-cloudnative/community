@@ -35,11 +35,8 @@ Fluid本身的开发由社区驱动，一方面需要加强社区方向的引导
 Reviewer要求：
 - 至少有一个Toc成员
 - 最低signoff人数是3人。小于3人需要Toc批准。signoff人数不设上限。
-- Toc有权要求增加reviewer。
-
- | Doc owner+Toc | 
-除特殊情况，doc owner不能是reviewer。 |
-| 4 Design review
+- Toc有权要求增加reviewer。| Doc owner+Toc | 除特殊情况，doc owner不能是reviewer。 |
+| 3 Design review
 1）Doc owner在钉钉群“Fluid研发**Design Review**工作群”中@具体的reviewer，附上doc link。
 2）Online doc review：Reviewer确保在**7天内完成**。
 3）Meeting评审：如果online doc review无法达成共识，则doc owner发起会议评审，前提是各reviwer已经把意见反馈到doc文档的comment区域。
@@ -47,26 +44,26 @@ Reviewer要求：
 
 ## FAQ
 
-问：什么粒度的方案需要发 Design Review？
-答：以下两类情况必须发 Design Review：
+问：什么粒度的方案需要发 Design Review？  
+答：以下两类情况必须发 Design Review：  
 1）对现有API（无论是对外的还是对内的）进行修改或新增API（比如新CRD）；
 2）Feature级别改动；
 
-问：Doc owner对最终设计方案负责，但是如果方案有问题reviewers是否也需要承担相应的一定的责任？
+问：Doc owner对最终设计方案负责，但是如果方案有问题reviewers是否也需要承担相应的一定的责任？  
 答：是。让reviewer参与signoff，就是一种共同担责的模式。
 ​
 
-问：Reviewer是否有权利拒绝一个Tech Review的邀请？
+问：Reviewer是否有权利拒绝一个Tech Review的邀请？  
 答：可以拒绝。doc owner和TL与reviewer沟通好即可。
 
 
-问：如果reviewer因为其他原因无法在7天内完成review，该怎么办？
+问：如果reviewer因为其他原因无法在7天内完成review，该怎么办？  
 答：reviewer需要向doc owner说明原因，申请延期多久完成或者建议换reviewer。
 
-问：如果临近7天截止期了，仍然有大部分人没有参与review也没有signoff，那应该怎么办？
+问：如果临近7天截止期了，仍然有大部分人没有参与review也没有signoff，那应该怎么办？  
 答：doc owner是整个事情的driver，他需要线下推动大家完成review工作和signoff，哪怕亲自上门去提醒。
 
-问：如果reviewer没有全部完成signoff，是否可以开工？
+问：如果reviewer没有全部完成signoff，是否可以开工？  
 答：review没有完成，并非完全不能开工。我们有时会邀请比较多的人参与review，解决reviewer的所有comments可能耗时比较长，如果整个开发工作block在那里，效率也不高。因此doc owner需要判断在一轮review后，是否收到的反馈里面有关键的、可能导致方案产生大的修改的问题要解决，如果没有这样问题，可以并行投入开发，但是需要承担一定风险（后续review过程中提到的方案修改可能导致返工）。 另外对于reviewer来说，也需要尽量把自己的反馈写的更清楚，并建议分类：如果是阻塞项目开发的意见，**建议用P1来标示醒目，表示这个问题不解决，作为评审不同意该方案继续进行**。
 
 
