@@ -1,4 +1,4 @@
-# 项目名称（project title）
+## 项目名称（project title）
 State: Approved (Draft, In review, Approved, Abandoned)
 Start time of Review Request：yyyyMMdd（发出review申请的时间，不是文档创建的时间）
 Owner: 
@@ -20,11 +20,11 @@ Owner:
 
 
 
-# 一、概述
+## 一、概述
 > 
 
 
-## 1、需求背景、概述及目标 （Required）
+### 1、需求背景、概述及目标 （Required）
 
 > 背景基本介绍
 
@@ -33,35 +33,35 @@ Owner:
 > 收益是什么
 
 
-## 2、需求案例（Use cases） （Required）
+### 2、需求案例（Use cases） （Required）
 
 
 > 通过案例描述系统是如何和最终用户或其它系统互动，从而描述一个明确的需求目标。
 
 
-# 二、关键设计与实现
-## 1、设计原则 （Required）
+## 二、关键设计与实现
+### 1、设计原则 （Required）
 
 
 > 关键的设计原则
 
 
 
-## 2、架构设计 （Optional）
+### 2、架构设计 （Optional）
 
 
 > 重点讲设计的整体，体现的是architecture、depolyment方面的内容。对外的依赖关系也需要在这个部分表达清楚。 方便整体技术评审
 
 
 
-## 3、详细设计（Required）
+### 3、详细设计（Required）
 
 
 > 重点讲设计的局部。主要有class diagram/sequence diagram等内容。
 > 
 
 
-## 4、实现 （Required）
+### 4、实现 （Required）
 
 
 > 讲清楚接口定义、数据结构、与编程语言相关的一些内容。比如Protobuffer定义、DSL表达。
@@ -70,28 +70,28 @@ Owner:
 
 
 
-# 三、可测性设计 （Required）
+## 三、可测性设计 （Required）
 > 如果该方案经过评估不需要新的可测性设计，请补充说明存在类似的功能，补充相应的文档。针对系统，模块或功能设计了什么方案来模拟测试？
 > 模拟测试方案本身是否可靠，模拟测试方案和正式环境后什么区别？发布后需要注意什么?
 
 
-# 四、可服务性/自服务能力 （Required）
+## 四、可服务性/自服务能力 （Required）
 > 用户如何自己进行问题诊断，如何自己修复问题
 
 
 
-# 七、未解决的问题 （Required）
+## 七、未解决的问题 （Required）
 > 说明在本设计中尚未解决而设计者认为在项目完成之前应该要解决的问题。
 
 ​
 
-# 八、替代方案 （Required）
+## 八、替代方案 （Required）
 > 1）所考虑过的替代方案。2）业界是否有类似值得参考的方案。
 
 
 
-# 九、附录 （Optional）
-## 1、名词定义
+## 九、附录 （Optional）
+### 1、名词定义
 
 
 > 介绍本文档中会使用到的专用名词，如：新创造名词、技术名词、产品内实体单位，但尽量使用大众可理解的词汇，方便大家对沟通和理解。
