@@ -29,8 +29,8 @@ Fluid本身的开发由社区驱动，一方面需要加强社区方向的引导
 
 | 步骤 | 执行人员 | 备注 |
 | --- | --- | --- |
-| 1、按照模板编写设计文档 | 研发人员（doc owner） | 文档模板：[design doc template](template.md) |
-| 2、确定Reviewers  <br>Reviewer要求： <br>- 至少有一个Toc成员  <br>- 最低signoff人数是3人。小于3人需要Toc批准。signoff人数不设上限。  <br>- Toc有权要求增加reviewer。| Doc owner+Toc | 除特殊情况，doc owner不能是reviewer。 | ||
+| 1、按照模板编写设计文档 | 研发人员（doc owner），需求提供方 | 文档模板：[design doc template](template.md) |
+| 2、确定Reviewers  <br>Reviewer要求： <br>- 至少有一个Toc成员  <br>- 最低signoff人数是3人。对于社区用户需求，需求提供方需要参与signoff。signoff人数不设上限。  <br>- Toc有权要求增加reviewer。| Doc owner+Toc | 除特殊情况，doc owner不能是reviewer。 | ||
 | 3 Design review  <br>1）Doc owner在钉钉群“Fluid研发**Design Review**工作群”中@具体的reviewer，附上doc link。  <br>2）Online doc review：Reviewer确保在**7天内完成**。  <br>3）Meeting评审：如果online doc review无法达成共识，则doc owner发起会议评审，前提是各reviwer已经把意见反馈到doc文档的comment区域。  <br>4）Signoff：每一个reviewer都需要最终表态这个设计方案是否通过/打回。 | Reviewers | 如果能够通过在线review完成，则不需要开会；如果需要会议review，具体形式由doc owner和reviewers商议决定。 | ||
 
 ## FAQ
