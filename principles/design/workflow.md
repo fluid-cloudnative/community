@@ -29,8 +29,7 @@ Fluid本身的开发由社区驱动，一方面需要加强社区方向的引导
 
 | 步骤 | 执行人员 | 备注 |
 | --- | --- | --- |
-| 1、按照模板编写设计文档 | 研发人员（doc owner） | 文档模板：
-[design doc template](template.md) |
+| 1、按照模板编写设计文档 | 研发人员（doc owner） | 文档模板：[design doc template](template.md) |
 | 2、确定Reviewers  
 Reviewer要求：  
 - 至少有一个Toc成员  
