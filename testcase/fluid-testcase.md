@@ -47,6 +47,11 @@
     - [创建AlluxioRuntime](#创建AlluxioRuntime)
     - [查看alluxio-worker所在节点](#查看alluxio-worker所在节点)
     - [扩容AlluxioRuntime](#扩容AlluxioRuntime)
+  - [10.不同并发场景下使用Patch进行更新节点标签](#不同并发场景下使用Patch进行更新节点标签)
+    - [多数据集并发调度到同一节点](#多数据集并发调度到同一节点)
+    - [多数据集在同一节点调度与删除](#多数据集在同一节点调度与删除)
+    - [多数据集在同一节点并发删除](#多数据集在同一节点并发删除)
+
 ## 1-安装fluid
 
 ### 获得最新的fluid项目
@@ -813,3 +818,268 @@ kubectl get pod -o custom-columns=NAME:metadata.name,NAME:.spec.nodeName | grep 
 可以看到，新建的alluxio-worker将依次被调度到node2~5。
 
 
+## 不同并发场景下使用Patch进行更新节点标签
+该部分验证了在并发场景下可以使用 patch 进行添加标签和删除标签的操作。为了模拟并发场景，需要将多个 dataset 同时调度到一个节点上。
+此时需要给特定的节点进行添加标签 fluid=multi-dataset ：
+```shell
+kubectl label node <nodeName> fluid=multi-dataset
+```
+
+### 准备工作
+该部分需要创建多个 dataset 和 runtime 的 yaml 文件，并且 dataset 只能够调度到添加标签的节点上。
+这里创建了 alluxioruntime-hbase.yaml 和 alluxioruntime-spark.yaml 两个文件。
+```shell
+apiVersion: data.fluid.io/v1alpha1
+kind: Dataset
+metadata:
+  name: hbase
+spec:
+  mounts:
+    - mountPoint: https://mirrors.tuna.tsinghua.edu.cn/apache/hbase/stable/
+      name: hbase
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: fluid
+              operator: In
+              values:
+                - "multi-dataset"
+  placement: "Shared"
+
+---
+apiVersion: data.fluid.io/v1alpha1
+kind: AlluxioRuntime
+metadata:
+  name: hbase
+spec:
+  replicas: 1
+  tieredstore:
+    levels:
+      - mediumtype: MEM
+        path: /dev/shm
+        quota: 2Gi
+        high: "0.95"
+        low: "0.7"
+```
+
+```shell
+apiVersion: data.fluid.io/v1alpha1
+kind: Dataset
+metadata:
+  name: spark
+spec:
+  mounts:
+    - mountPoint: https://mirrors.tuna.tsinghua.edu.cn/apache/spark
+      name: hbase
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: fluid
+              operator: In
+              values:
+                - "multi-dataset"
+  placement: "Shared"
+
+---
+apiVersion: data.fluid.io/v1alpha1
+kind: AlluxioRuntime
+metadata:
+  name: spark
+spec:
+  replicas: 2
+  tieredstore:
+    levels:
+      - mediumtype: MEM
+        path: /dev/shm
+        quota: 2Gi
+        high: "0.95"
+        low: "0.7"
+
+```
+为了能够模拟多个不同类型的 runtime 同时进行调度的情况，这里还添加了 jindoruntime.yaml。
+```shell
+apiVersion: data.fluid.io/v1alpha1
+kind: Dataset
+metadata:
+  name: jindo
+spec:
+  mounts:
+    - mountPoint: oss://ch****set
+      name: oss1
+      options:
+        fs.oss.accessKeyId: LTAI4****ZDWn
+        fs.oss.accessKeySecret: fq6U0aZJ9v****vUvLnlvAQ7d
+        fs.oss.endpoint: oss-cn-****.aliyuncs.com
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: fluid
+              operator: In
+              values:
+                - "multi-dataset"
+  placement: "Shared"
+
+---
+
+apiVersion: data.fluid.io/v1alpha1
+kind: JindoRuntime
+metadata:
+  name: jindo
+spec:
+  replicas: 1
+  tieredstore:
+    levels:
+      - mediumtype: HDD
+        path: /mnt/disk1
+        quota: 2Gi
+        high: "0.9"
+        low: "0.8"
+
+```
+
+### 多数据集并发调度到同一节点
+这一部分检验一下在多个 dataset 同时进行调度到某个节点时，节点中的标签能否进行添加。
+首先创建脚本 add.sh：
+```shell
+kubectl apply -f alluxioruntime-hbase.yaml
+kubectl apply -f jindoruntime.yaml
+```
+经过一段时间后，可以发现对应的 pod 均创建完毕：
+```shell
+# kubectl get pods 
+NAME                         READY   STATUS    RESTARTS   AGE
+hbase-fuse-cgrwk             1/1     Running   0          2s
+hbase-master-0               2/2     Running   0          31s
+hbase-worker-mmkx7           2/2     Running   0          2s
+jindo-jindofs-fuse-bqfhk     1/1     Running   0          10s
+jindo-jindofs-master-0       1/1     Running   0          30s
+jindo-jindofs-worker-f5k9p   1/1     Running   0          10s
+```
+此时查看对应节点的标签信息，发现对应的标签已经进行了添加：
+```shell
+Labels:             alibabacloud.com/nodepool-id=npd22c305c1ad548f698e59382afce8972
+                    aliyun.accelerator/nvidia_name=Tesla-V100-SXM2-16GB
+                    beta.kubernetes.io/arch=amd64
+                    beta.kubernetes.io/instance-type=ecs.g5ne.2xlarge
+                    beta.kubernetes.io/os=linux
+                    failure-domain.beta.kubernetes.io/region=cn-beijing
+                    failure-domain.beta.kubernetes.io/zone=cn-beijing-g
+                    fluid=multi-dataset
+                    fluid.io/dataset-num=2
+                    fluid.io/s-alluxio-default-hbase=true
+                    fluid.io/s-default-hbase=true
+                    fluid.io/s-default-jindo=true
+                    fluid.io/s-h-alluxio-m-default-hbase=2GiB
+                    fluid.io/s-h-alluxio-t-default-hbase=2GiB
+                    fluid.io/s-h-jindo-d-default-jindo=2GiB
+                    fluid.io/s-h-jindo-t-default-jindo=2GiB
+                    fluid.io/s-jindo-default-jindo=true
+                    giraph-cache=true
+                    hbase=true
+                    hbase-cache=true
+                    hhj=label-test
+                    kubernetes.io/arch=amd64
+                    kubernetes.io/hostname=cn-beijing.192.168.1.146
+                    kubernetes.io/os=linux
+                    node.kubernetes.io/instance-type=ecs.g5ne.2xlarge
+                    nonroot=true
+                    topology.diskplugin.csi.alibabacloud.com/zone=cn-beijing-g
+                    topology.kubernetes.io/region=cn-beijing
+                    topology.kubernetes.io/zone=cn-beijing-g
+```
+可以发现标签 fluid.io/dataset-num 正确的统计了该节点上的 dataset 的数量，fluid.io/s-h-alluxio-m-default-hbase、fluid.io/s-h-alluxio-t-default-hbase 正确统计了 hbase 的内存占用的大小和总占用空间的大小。
+另外 fluid.io/s-alluxio-default-hbase=true，fluid.io/s-default-hbase=true 这两个标签表明了 name 为 hbase 的 dataset 调度在该节点上。name 为jindo 的 dataset 的对应标签也是类似。这表明了通过 patch 在多 dataset 同时调度的情况下可以正确给节点添加上标签。
+
+### 多数据集在同一节点调度与删除
+这一部分检验一下部分 dataset 进行调度，部分 dataset 进行删除时，节点中的标签能否进行添加或者删除。
+首先创建脚本 delete-add.sh：
+```shell
+kubectl delete dataset hbase
+kubectl apply -f allluxioruntime-spark.yaml
+```
+经过一段时间后，可以发现对应的 pod 均创建或者删除完毕：
+```shell
+# kubectl get pods 
+NAME                         READY   STATUS    RESTARTS   AGE
+jindo-jindofs-fuse-bqfhk     1/1     Running   0          6m1s
+jindo-jindofs-master-0       1/1     Running   0          6m21s
+jindo-jindofs-worker-f5k9p   1/1     Running   0          6m1s
+spark-fuse-vp7q5             1/1     Running   0          79s
+spark-master-0               2/2     Running   0          111s
+spark-worker-pssjw           2/2     Running   0          79s
+```
+此时查看对应节点的标签信息，发现对应的标签已经进行了添加或者删除：
+```shell
+Labels:             alibabacloud.com/nodepool-id=npd22c305c1ad548f698e59382afce8972
+                    aliyun.accelerator/nvidia_name=Tesla-V100-SXM2-16GB
+                    beta.kubernetes.io/arch=amd64
+                    beta.kubernetes.io/instance-type=ecs.g5ne.2xlarge
+                    beta.kubernetes.io/os=linux
+                    failure-domain.beta.kubernetes.io/region=cn-beijing
+                    failure-domain.beta.kubernetes.io/zone=cn-beijing-g
+                    fluid=multi-dataset
+                    fluid.io/dataset-num=2
+                    fluid.io/s-alluxio-default-spark=true
+                    fluid.io/s-default-jindo=true
+                    fluid.io/s-default-spark=true
+                    fluid.io/s-h-alluxio-m-default-spark=2GiB
+                    fluid.io/s-h-alluxio-t-default-spark=2GiB
+                    fluid.io/s-h-jindo-d-default-jindo=2GiB
+                    fluid.io/s-h-jindo-t-default-jindo=2GiB
+                    fluid.io/s-jindo-default-jindo=true
+                    giraph-cache=true
+                    hbase=true
+                    hbase-cache=true
+                    hhj=label-test
+                    kubernetes.io/arch=amd64
+                    kubernetes.io/hostname=cn-beijing.192.168.1.146
+                    kubernetes.io/os=linux
+                    node.kubernetes.io/instance-type=ecs.g5ne.2xlarge
+                    nonroot=true
+                    topology.diskplugin.csi.alibabacloud.com/zone=cn-beijing-g
+                    topology.kubernetes.io/region=cn-beijing
+                    topology.kubernetes.io/zone=cn-beijing-g
+
+```
+通过节点的标签可以看出，有关 name 为 hbase 相关的标签全部都被删除，新增了 name 为 spark 的相关标签，可以发现部分 dataset 进行调度，部分 dataset 进行删除时，可以通过 patch 正确的对标签进行相应处理。
+
+### 多数据集在同一节点并发删除
+这一部分检验一下多个 dataset 同时进行删除时，节点中的标签能否进行删除。
+首先创建脚本 delete.sh：
+```shell
+kubectl delete dataset --all
+```
+经过一段时间后，可以发现对应的 pod 均删除完毕：
+```shell
+# kubectl get pods 
+No resources found in default namespace.
+
+```
+此时查看对应节点的标签信息，发现对应的标签已经进行了删除：
+```shell
+Labels:             alibabacloud.com/nodepool-id=npd22c305c1ad548f698e59382afce8972
+                    aliyun.accelerator/nvidia_name=Tesla-V100-SXM2-16GB
+                    beta.kubernetes.io/arch=amd64
+                    beta.kubernetes.io/instance-type=ecs.g5ne.2xlarge
+                    beta.kubernetes.io/os=linux
+                    failure-domain.beta.kubernetes.io/region=cn-beijing
+                    failure-domain.beta.kubernetes.io/zone=cn-beijing-g
+                    fluid=multi-dataset
+                    giraph-cache=true
+                    hbase=true
+                    hbase-cache=true
+                    hhj=label-test
+                    kubernetes.io/arch=amd64
+                    kubernetes.io/hostname=cn-beijing.192.168.1.146
+                    kubernetes.io/os=linux
+                    node.kubernetes.io/instance-type=ecs.g5ne.2xlarge
+                    nonroot=true
+                    topology.diskplugin.csi.alibabacloud.com/zone=cn-beijing-g
+                    topology.kubernetes.io/region=cn-beijing
+                    topology.kubernetes.io/zone=cn-beijing-g
+
+```
+通过节点的标签可以发现该节点上 spark 和 jindo 的对应标签全部被删除了，从而表明了 patch 操作对于 dataset 删除操作过程中操作标签的正确性。
