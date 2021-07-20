@@ -47,6 +47,11 @@
     - [创建AlluxioRuntime](#创建AlluxioRuntime)
     - [查看alluxio-worker所在节点](#查看alluxio-worker所在节点)
     - [扩容AlluxioRuntime](#扩容AlluxioRuntime)
+  - [10.不同并发场景下使用Patch进行更新节点标签](#不同并发场景下使用Patch进行更新节点标签)
+    - [多数据集并发调度到同一节点](#多数据集并发调度到同一节点)
+    - [多数据集在同一节点并发调度与删除](#多数据集在同一节点并发调度与删除)
+    - [多数据集在同一节点并发删除](#多数据集在同一节点并发删除)
+
 ## 1-安装fluid
 
 ### 获得最新的fluid项目
@@ -813,3 +818,159 @@ kubectl get pod -o custom-columns=NAME:metadata.name,NAME:.spec.nodeName | grep 
 可以看到，新建的alluxio-worker将依次被调度到node2~5。
 
 
+## 同一 runtime 类型条件下不同并发场景使用Patch进行更新节点标签
+该部分验证了在同一 runtime 类型条件下不同并发场景可以使用 patch 对节点进行添加标签和删除标签的功能。为了简化并发场景，可以在单个节点上进行实验。
+此时需要给特定的节点进行添加标签 fluid=multi-dataset ：
+```shell
+kubectl label node <nodeName> fluid=multi-dataset
+```
+
+### 准备工作
+该部分需要创建多个 dataset 和 runtime 的 yaml 文件，并且 dataset 只能够调度到添加标签的节点上。本实验中将 dataset 和 runtime 放在同一个 yaml 文件
+中，文件名称分别为 hbase1.yaml、hbase2.yaml、hbase3.yaml、hbase4.yaml、hbase5.yaml。他们对应的 runtime 都是 alluxioruntime。这里需要注意的是本功能仅支持同一类型的 runtime 进行操作，并不支持对于多种类型 runtime 进行同时调度到一个节点的情况。
+其中 hbase1.yaml 文件内容如下：
+```shell
+apiVersion: data.fluid.io/v1alpha1
+kind: Dataset
+metadata:
+  name: hbase1
+spec:
+  mounts:
+    - mountPoint: https://mirrors.tuna.tsinghua.edu.cn/apache/hbase/stable/
+      name: hbase
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: fluid
+              operator: In
+              values:
+                - "multi-dataset"
+  placement: "Shared"
+
+---
+apiVersion: data.fluid.io/v1alpha1
+kind: AlluxioRuntime
+metadata:
+  name: hbase1
+spec:
+  replicas: 1
+  tieredstore:
+    levels:
+      - mediumtype: MEM
+        path: /dev/shm
+        quota: 2Gi
+        high: "0.95"
+        low: "0.7"
+```
+
+### 多数据集并发调度到同一节点
+这一部分检验一下在多个 dataset 同时进行调度到某个节点时，该节点中的标签能否进行正确添加。
+首先创建脚本 add.sh：
+```shell
+kubectl apply -f hbase1.yaml
+kubectl apply -f hbase2.yaml
+kubectl apply -f hbase3.yaml
+```
+经过一段时间后，可以发现对应的 pod 均创建完毕：
+```shell
+# kubectl get pods 
+NAME                           READY   STATUS    RESTARTS   AGE
+hbase1-fuse-lnvvb              1/1     Running   0          4s
+hbase1-master-0                2/2     Running   0          40s
+hbase1-worker-jbj5b            2/2     Running   0          4s
+hbase2-fuse-7lp64              1/1     Running   0          6s
+hbase2-master-0                2/2     Running   0          39s
+hbase2-worker-cw76l            2/2     Running   0          6s
+hbase3-fuse-rphq5              1/1     Running   0          5s
+hbase3-master-0                2/2     Running   0          38s
+hbase3-worker-zn2cf            2/2     Running   0          5s
+
+```
+
+此时查看对应节点的标签信息，发现对应的标签已经进行了添加：
+```shell
+Labels:             ...
+                    fluid.io/dataset-num=3
+                    fluid.io/s-alluxio-default-hbase1=true
+                    fluid.io/s-alluxio-default-hbase2=true
+                    fluid.io/s-alluxio-default-hbase3=true
+                    fluid.io/s-default-hbase1=true
+                    fluid.io/s-default-hbase2=true
+                    fluid.io/s-default-hbase3=true
+                    fluid.io/s-h-alluxio-m-default-hbase1=2GiB
+                    fluid.io/s-h-alluxio-m-default-hbase2=2GiB
+                    fluid.io/s-h-alluxio-m-default-hbase3=2GiB
+                    fluid.io/s-h-alluxio-t-default-hbase1=2GiB
+                    fluid.io/s-h-alluxio-t-default-hbase2=2GiB
+                    fluid.io/s-h-alluxio-t-default-hbase3=2GiB
+                    ...
+```
+
+此时可以发现，标签 fluid.io/dataset-num 正确的统计了该节点上的 dataset 的数量，fluid.io/s-h-alluxio-m-default-hbase1、fluid.io/s-h-alluxio-t-default-hbase1 正确统计了 hbase1 的内存占用的大小和总占用空间的大小。
+另外 fluid.io/s-alluxio-default-hbase1=true，fluid.io/s-default-hbase1=true 这两个标签表明了 name 为 hbase1 的 dataset 调度在该节点上。其余 dataset 对应标签均类似。这表明了通过 patch 在多 dataset 同时调度到某节点时可以正确给节点添加上标签。
+
+### 多数据集在同一节点并发调度与删除
+这一部分检验一下在部分 dataset 进行调度，部分 dataset 进行删除时，节点中的标签能否进行添加或者删除。
+首先创建脚本 add-delete.sh：
+```shell
+kubectl apply -f alluxioruntime4.yaml
+kubectl apply -f alluxioruntime5.yaml
+kubectl delete dataset hbase1
+kubectl delete dataset hbase2
+```
+经过一段时间后，可以发现对应的 pod 均创建或者删除完毕：
+```shell
+# kubectl get pods 
+NAME                           READY   STATUS    RESTARTS   AGE
+hbase3-fuse-rphq5              1/1     Running   0          5m21s
+hbase3-master-0                2/2     Running   0          5m54s
+hbase3-worker-zn2cf            2/2     Running   0          5m21s
+hbase4-fuse-28t2q              1/1     Running   0          4s
+hbase4-master-0                2/2     Running   0          36s
+hbase4-worker-xcflx            2/2     Running   0          4s
+hbase5-fuse-cpz4r              1/1     Running   0          5s
+hbase5-master-0                2/2     Running   0          38s
+hbase5-worker-fgww4            2/2     Running   0          5s
+```
+此时查看对应节点的标签信息，发现对应的标签已经进行了添加或者删除：
+```shell
+Labels:             ...         
+                    fluid=multi-dataset
+                    fluid.io/dataset-num=3
+                    fluid.io/s-alluxio-default-hbase3=true
+                    fluid.io/s-alluxio-default-hbase4=true
+                    fluid.io/s-alluxio-default-hbase5=true
+                    fluid.io/s-default-hbase3=true
+                    fluid.io/s-default-hbase4=true
+                    fluid.io/s-default-hbase5=true
+                    fluid.io/s-h-alluxio-m-default-hbase3=2GiB
+                    fluid.io/s-h-alluxio-m-default-hbase4=2GiB
+                    fluid.io/s-h-alluxio-m-default-hbase5=2GiB
+                    fluid.io/s-h-alluxio-t-default-hbase3=2GiB
+                    fluid.io/s-h-alluxio-t-default-hbase4=2GiB
+                    fluid.io/s-h-alluxio-t-default-hbase5=2GiB
+                    ...
+```
+通过节点的标签可以看出，有关 name 为 hbase1 和 hbase2 相关的标签全部都被删除，新增了 name 为 hbase4 和 hbase5 的相关标签。可以发现部分 dataset 进行调度，部分 dataset 进行删除时，可以通过 patch 正确的对标签进行相应处理。
+
+### 多数据集在同一节点并发删除
+这一部分检验一下多个 dataset 同时进行删除时，节点中的标签能否进行删除。
+首先创建脚本 delete.sh：
+```shell
+kubectl delete dataset --all
+```
+经过一段时间后，可以发现对应的 pod 均删除完毕：
+```shell
+# kubectl get pods 
+No resources found in default namespace.
+```
+此时查看对应节点的标签信息，发现对应的标签已经进行了删除：
+```shell
+Labels:             ...
+                    fluid=multi-dataset
+                    ...
+```
+通过节点的标签可以发现该节点上之前添加的 dataset 相关标签全部被删除了，从而表明了 patch 操作对于多个 dataset 同时删除操作过程中操作标签的正确性。
+
+这里需要注意的是目前该功能只支持同种类型的 runtime 进行并发的进行调度和删除，并不支持对于多种类型 runtime 进行同时调度和删除。
