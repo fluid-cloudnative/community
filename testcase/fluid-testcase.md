@@ -2,52 +2,56 @@
 
 ## 目录
 
-- [1.安装fluid](#1-安装fluid)
-  - [获得最新的fluid项目](#获得最新的fluid项目)
-    - [无fluid仓库](#无fluid仓库)
-    - [有fluid仓库](#有fluid仓库)
-  - [卸载旧版本的fluid](#卸载旧版本的fluid)
-  - [安装fluid](#安装fluid)
-  - [检查fluid运行状态](#检查fluid运行状态)
-- [2.创建Dataset](#2-创建Dataset)
-  - [创建Dataset对应的yaml文件](#创建Dataset对应的yaml文件)
-  - [创建Dataset](#创建Dataset)
-- [3.创建AlluxioRuntime](#3-创建AlluxioRuntime)
-  - [创建AlluxioRuntime对应的yaml文件](#创建AlluxioRuntime对应的yaml文件)
-  - [创建AlluxioRuntime](#创建AlluxioRuntime)
-  - [检查AlluxioRuntime对应的pod是否正常运行](#检查AlluxioRuntime对应的pod是否正常运行)
-  - [检查PV和PVC是否正常创建](#检查PV和PVC是否正常创建)
-- [4.判断Dataset是否bound](#4-判断Dataset是否bound)
-  - [检查AlluxioRuntime是否Ready](#检查AlluxioRuntime是否Ready)
-  - [检查Dataset是否bound](#检查Dataset是否bound)
-- [5.删除Dataset](#5-删除Dataset)
-- [6.删除AlluxioRuntime](#6-删除AlluxioRuntime)
-- [7.DataLoad数据预加载](#7-DataLoad数据预加载)
-  - [创建DataLoad对应的yaml文件](#创建DataLoad对应的yaml文件)
-  - [创建DataLoad](#创建DataLoad)
-  - [检查DataLoad是否已经正常运行](#检查DataLoad是否已经正常运行)
-  - [检查DataLoad是否执行成功](#检查DataLoad是否执行成功)
-  - [删除DataLoad](#删除DataLoad)
-- [8.DataBackup数据备份](#8-DataBackup数据备份)
-  - [备份到本地](#备份到本地)
-    - [删除历史备份记录-local](#删除历史备份记录-local)
-    - [创建DataBackup对应的yaml文件-local](#创建DataBackup对应的yaml文件-local)
-    - [创建DataBackup-local](#创建DataBackup-local)
-    - [检查DataBackup是否执行成功-local](#检查DataBackup是否执行成功-local)
-  - [备份到PVC](#备份到PVC)
-    - [创建PV和PVC](#创建PV和PVC)
-    - [删除历史备份记录-pvc](#删除历史备份记录-pvc)
-    - [创建DataBackup对应的yaml文件-pvc](#创建DataBackup对应的yaml文件-pvc)
-    - [创建DataBackup-pvc](#创建DataBackup-pvc)
-    - [检查DataBackup是否执行成功-pvc](#检查DataBackup是否执行成功-pvc)
-  - [删除DataBackup](#删除DataBackup)
-  - [9.Fuse客户端全局部署模式下扩容AlluxioRuntime](#Fuse客户端全局部署模式下扩容AlluxioRuntime)
+- [fluid测试用例](#fluid测试用例)
+  - [目录](#目录)
+  - [1-安装fluid](#1-安装fluid)
+    - [获得最新的fluid项目](#获得最新的fluid项目)
+      - [无fluid仓库](#无fluid仓库)
+      - [有fluid仓库](#有fluid仓库)
+    - [卸载旧版本的fluid](#卸载旧版本的fluid)
+    - [安装fluid](#安装fluid)
+    - [检查fluid运行状态](#检查fluid运行状态)
+  - [2-创建Dataset](#2-创建dataset)
+    - [创建Dataset对应的yaml文件](#创建dataset对应的yaml文件)
+    - [创建Dataset](#创建dataset)
+  - [3-创建AlluxioRuntime](#3-创建alluxioruntime)
+    - [创建AlluxioRuntime对应的yaml文件](#创建alluxioruntime对应的yaml文件)
+    - [创建AlluxioRuntime](#创建alluxioruntime)
+    - [检查AlluxioRuntime对应的pod是否正常运行](#检查alluxioruntime对应的pod是否正常运行)
+    - [检查PV和PVC是否正常创建](#检查pv和pvc是否正常创建)
+  - [4-判断Dataset是否bound](#4-判断dataset是否bound)
+    - [检查AlluxioRuntime是否Ready](#检查alluxioruntime是否ready)
+    - [检查Dataset是否bound](#检查dataset是否bound)
+  - [5-删除Dataset](#5-删除dataset)
+  - [6-删除AlluxioRuntime](#6-删除alluxioruntime)
+  - [7-DataLoad数据预加载](#7-dataload数据预加载)
+    - [创建DataLoad对应的yaml文件](#创建dataload对应的yaml文件)
+    - [创建DataLoad](#创建dataload)
+    - [检查DataLoad是否已经正常运行](#检查dataload是否已经正常运行)
+    - [检查DataLoad是否执行成功](#检查dataload是否执行成功)
+    - [删除DataLoad](#删除dataload)
+  - [8-DataBackup数据备份](#8-databackup数据备份)
+    - [备份到本地](#备份到本地)
+      - [删除历史备份记录-local](#删除历史备份记录-local)
+      - [创建DataBackup对应的yaml文件-local](#创建databackup对应的yaml文件-local)
+      - [创建DataBackup-local](#创建databackup-local)
+      - [检查DataBackup是否执行成功-local](#检查databackup是否执行成功-local)
+    - [备份到PVC](#备份到pvc)
+      - [创建PV和PVC](#创建pv和pvc)
+      - [删除历史备份记录-pvc](#删除历史备份记录-pvc)
+      - [创建DataBackup对应的yaml文件-pvc](#创建databackup对应的yaml文件-pvc)
+      - [创建DataBackup-pvc](#创建databackup-pvc)
+      - [检查DataBackup是否执行成功-pvc](#检查databackup是否执行成功-pvc)
+    - [删除DataBackup](#删除databackup)
+  - [9-Fuse客户端全局部署模式下扩容AlluxioRuntime](#9-fuse客户端全局部署模式下扩容alluxioruntime)
     - [查看节点信息](#查看节点信息)
-    - [创建Dataset](#创建Dataset)
-    - [创建AlluxioRuntime](#创建AlluxioRuntime)
+    - [创建Dataset](#创建dataset-1)
+    - [创建AlluxioRuntime](#创建alluxioruntime-1)
     - [查看alluxio-worker所在节点](#查看alluxio-worker所在节点)
-    - [扩容AlluxioRuntime](#扩容AlluxioRuntime)
-  - [10.不同并发场景下使用Patch进行更新节点标签](#不同并发场景下使用Patch进行更新节点标签)
+    - [创建Nginx容器](#创建nginx容器)
+    - [扩容AlluxioRuntime](#扩容alluxioruntime)
+  - [10-同一runtime类型条件下不同并发场景使用Patch进行更新节点标签](#10-同一runtime类型条件下不同并发场景使用patch进行更新节点标签)
+    - [准备工作](#准备工作)
     - [多数据集并发调度到同一节点](#多数据集并发调度到同一节点)
     - [多数据集在同一节点并发调度与删除](#多数据集在同一节点并发调度与删除)
     - [多数据集在同一节点并发删除](#多数据集在同一节点并发删除)
@@ -684,7 +688,7 @@ kubectl delete databackup spark-backup-local
 kubectl get databackup | awk '$1=="spark-backup-local"'
 ```
 
-## Fuse客户端全局部署模式下扩容AlluxioRuntime
+## 9-Fuse客户端全局部署模式下扩容AlluxioRuntime
 
 ### 查看节点信息
 
@@ -725,7 +729,7 @@ EOF
 kubectl create -f dataset.yaml
 ```
 
-## 创建AlluxioRuntime
+### 创建AlluxioRuntime
 
 检查待创建的AlluxioRuntime对象：
 
@@ -818,7 +822,7 @@ kubectl get pod -o custom-columns=NAME:metadata.name,NAME:.spec.nodeName | grep 
 可以看到，新建的alluxio-worker将依次被调度到node2~5。
 
 
-## 同一 runtime 类型条件下不同并发场景使用Patch进行更新节点标签
+## 10-同一runtime类型条件下不同并发场景使用Patch进行更新节点标签
 该部分验证了在同一 runtime 类型条件下不同并发场景可以使用 patch 对节点进行添加标签和删除标签的功能。为了简化并发场景，可以在单个节点上进行实验。
 此时需要给特定的节点进行添加标签 fluid=multi-dataset ：
 ```shell
