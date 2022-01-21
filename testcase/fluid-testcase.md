@@ -55,6 +55,12 @@
     - [多数据集并发调度到同一节点](#多数据集并发调度到同一节点)
     - [多数据集在同一节点并发调度与删除](#多数据集在同一节点并发调度与删除)
     - [多数据集在同一节点并发删除](#多数据集在同一节点并发删除)
+  - [11-Fuse挂载点自动恢复](#11-fuse挂载点自动恢复)
+    - [前置需求](#前置需求)
+    - [创建Dataset和AlluxioRuntime](#创建dataset和alluxioruntime)
+    - [为Namespace开启Webhook自动注入能力](#为namespace开启webhook自动注入能力)
+    - [创建业务Pod](#创建业务pod)
+    - [Fuse挂载点自动恢复测试](#fuse挂载点自动恢复测试)
 
 ## 1-安装fluid
 
@@ -978,3 +984,157 @@ Labels:             ...
 通过节点的标签可以发现该节点上之前添加的 dataset 相关标签全部被删除了，从而表明了 patch 操作对于多个 dataset 同时删除操作过程中操作标签的正确性。
 
 这里需要注意的是目前该功能只支持同种类型的 runtime 进行并发的进行调度和删除，并不支持对于多种类型 runtime 进行同时调度和删除。
+
+## 11-Fuse挂载点自动恢复
+
+### 前置需求
+
+正常安装Fluid v0.7.0+版本，并启用Fuse挂载点自动恢复功能:
+```shell
+$ helm install --set csi.recoverFusePeriod=30 fluid charts/fluid/fluid
+```
+
+Fluid所有Pod均正常运行:
+```
+$ kubectl get pod -n fluid-system
+NAME                                        READY   STATUS    RESTARTS   AGE
+alluxioruntime-controller-ddbb764fb-v5x6j   1/1     Running   0          91m
+csi-nodeplugin-fluid-hpmfx                  2/2     Running   0          91m
+dataset-controller-57477b5fcd-hhgkk         1/1     Running   0          91m
+fluid-webhook-6c457896dc-dhx6f              1/1     Running   0          91m
+jindoruntime-controller-676755d897-fjd5w    1/1     Running   0          91m
+```
+
+查看Fluid CSI Plugin日志, 确认Fuse挂载点自动恢复功能正常启动，看到如下日志:
+```
+$ kubectl logs -n fluid-system csi-nodeplugin-fluid-hpmfx -c plugins
+...
+I0121 19:03:58.920429  863993 recover.go:70] start csi recover
+...
+```
+
+### 创建Dataset和AlluxioRuntime
+
+```yaml
+cat << EOF > dataset.yaml
+kind: Dataset
+metadata:
+  name: hbase
+spec:
+  mounts:
+    - mountPoint: https://mirrors.tuna.tsinghua.edu.cn/apache/hbase/stable
+      name: hbase
+---
+apiVersion: data.fluid.io/v1alpha1
+kind: AlluxioRuntime
+metadata:
+  name: hbase
+spec:
+  replicas: 1
+  tieredstore:
+    levels:
+      - mediumtype: MEM
+        path: /dev/shm
+        quota: 2Gi
+        high: "0.95"
+        low: "0.7"
+EOF
+```
+
+```shell
+$ kubectl create -f dataset.yaml
+```
+
+等待Dataset和AlluxioRuntime正常启动:
+```shell
+$ kubectl get dataset,alluxioruntime
+NAME                          UFS TOTAL SIZE   CACHED   CACHE CAPACITY   CACHED PERCENTAGE   PHASE   AGE
+dataset.data.fluid.io/hbase   566.22MiB        0.00B    2.00GiB          0.0%                Bound   51s
+
+NAME                                 MASTER PHASE   WORKER PHASE   FUSE PHASE   AGE
+alluxioruntime.data.fluid.io/hbase   Ready          Ready          Ready        51s
+```
+
+### 为Namespace开启Webhook自动注入能力
+
+Fuse挂载点自动恢复功能需要确保pod的mountPropagation设置为`HostToContainer`或`Bidirectional`。Fluid Webhook能够检查并注入mountPropagation字段，以保证Fuse挂载点自动恢复功能正常运作。具体信息请参考[此处](https://github.com/fluid-cloudnative/fluid/blob/master/docs/zh/samples/fuse_recover.md)
+
+为`default` namespace开启Webhook注入功能，开启后，所有`default` namepsace下挂载Fluid Dataset PVC的Pod都会被注入上述信息:
+```shell
+$ kubectl patch ns default -p '{"metadata": {"labels": {"fluid.io/enable-injection": "true"}}}'
+
+$ kubectl get ns default --show-labels
+NAME      STATUS   AGE     LABELS
+default   Active   4d12h   fluid.io/enable-injection=true
+```
+
+### 创建业务Pod
+
+创建Nginx Pod模拟Fluid Dataset的数据消费者:
+```yaml
+$ cat << EOF > nginx.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+spec:
+  containers:
+    - name: nginx
+      image: nginx
+      volumeMounts:
+        - mountPath: /data
+          name: hbase-vol
+          # mountPropagation: HostToContainer (auto-injected by webhook)
+  volumes:
+    - name: hbase-vol
+      persistentVolumeClaim:
+        claimName: hbase
+EOF
+```
+
+```shell
+$ kubectl create -f nginx.yaml
+```
+
+查看Webhook信息注入是否正常:
+```shell
+$ kubectl get pod nginx -o yaml | grep -B1 -A1 mountPropagation
+...
+      - mountPath: /data
+        mountPropagation: HostToContainer
+        name: hbase-vol
+```
+
+### Fuse挂载点自动恢复测试
+
+当Nginx Pod正常启动后，可在Fuse挂载点处正常访问数据集中的文件:
+```shell
+$ kubectl exec -it nginx -- ls /data/hbase
+CHANGES.md                          hbase-2.4.9-bin.tar.gz
+RELEASENOTES.md                     hbase-2.4.9-client-bin.tar.gz
+api_compare_2.4.8_to_2.4.9RC0.html  hbase-2.4.9-src.tar.gz
+```
+
+此时，删除Alluxio Fuse Pod，模拟Alluxio Fuse异常崩溃情况:
+```shell
+$ kubectl delete pod hbase-fuse-gcjsc
+```
+
+检查Nginx Pod中的数据访问，应当发现'Transport endpoint is not connected'问题
+```shell
+kubectl exec -it nginx -- ls /data/hbase
+ls: cannot open directory '/data/hbase': Transport endpoint is not connected
+```
+
+等待一段时间(约30s), 观测到Fluid Dataset上报出的Fuse挂载点已自动恢复的事件后:
+```shell
+Normal  FuseRecoverSucceed  75s (x1 over 2m15s)  FuseRecover  Fuse recover /var/lib/kubelet/pods/5fbfc0f0-9a1e-41fe-9d3f-5cca3daa24a8/volumes/kubernetes.io~csi/default-hbase/mount succeed
+```
+
+再次检查Nginx Pod中的数据访问，此时恢复正常的数据访问能力:
+```shell
+kubectl exec -it nginx -- ls /data/hbase
+CHANGES.md                          hbase-2.4.9-bin.tar.gz
+RELEASENOTES.md                     hbase-2.4.9-client-bin.tar.gz
+api_compare_2.4.8_to_2.4.9RC0.html  hbase-2.4.9-src.tar.gz
+```
