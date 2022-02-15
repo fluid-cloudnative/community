@@ -39,12 +39,18 @@
     - [多数据集并发调度到同一节点](#多数据集并发调度到同一节点)
     - [多数据集在同一节点并发调度与删除](#多数据集在同一节点并发调度与删除)
     - [多数据集在同一节点并发删除](#多数据集在同一节点并发删除)
-  - [11-Fuse挂载点自动恢复](#11-fuse挂载点自动恢复)
-    - [前置需求](#前置需求)
+  - [6-Fuse挂载点自动恢复](#6-fuse挂载点自动恢复)
+    - [准备工作](#准备工作-1)
     - [创建Dataset和AlluxioRuntime](#创建dataset和alluxioruntime-1)
     - [为Namespace开启Webhook自动注入能力](#为namespace开启webhook自动注入能力)
     - [创建业务Pod](#创建业务pod)
     - [Fuse挂载点自动恢复测试](#fuse挂载点自动恢复测试)
+  - [7-Fluid升级过程中使用Dataset](#7-fluid升级过程中使用dataset)
+    - [准备工作](#准备工作-2)
+    - [升级Fluid](#升级fluid)
+    - [新版本下创建Dataset](#新版本下创建dataset)
+    - [访问Dataset中数据](#访问dataset中数据)
+    - [环境清理](#环境清理-2)
   - [9-Fuse客户端全局部署模式下扩容AlluxioRuntime](#9-fuse客户端全局部署模式下扩容alluxioruntime)
     - [查看节点信息](#查看节点信息)
     - [创建Dataset](#创建dataset)
@@ -887,9 +893,9 @@ Labels:             ...
 
 这里需要注意的是目前该功能只支持同种类型的 runtime 进行并发的进行调度和删除，并不支持对于多种类型 runtime 进行同时调度和删除。
 
-## 11-Fuse挂载点自动恢复
+## 6-Fuse挂载点自动恢复
 
-### 前置需求
+### 准备工作
 
 正常安装Fluid v0.7.0+版本，并启用Fuse挂载点自动恢复功能:
 ```shell
@@ -1041,7 +1047,219 @@ RELEASENOTES.md                     hbase-2.4.9-client-bin.tar.gz
 api_compare_2.4.8_to_2.4.9RC0.html  hbase-2.4.9-src.tar.gz
 ```
 
+## 7-Fluid升级过程中使用Dataset
+
+以下例子以Fluid v0.6升级至0.7为例，测试Fluid升级对使用Dataset过程是否有影响。
+
+### 准备工作
+
+**安装旧版本Fluid**
+
+```
+$ git clone https://github.com/fluid-cloudnative/fluid.git /fluid
+```
+
+```
+$ kubectl create ns fluid-system
+
+$ helm install fluid /fluid/charts/fluid/v0.6.0
+```
+
+**旧版本下使用Dataset**
+
+```
+$ cat << EOF > old_dataset.yaml
+apiVersion: data.fluid.io/v1alpha1
+kind: Dataset
+metadata:
+  name: hbase
+spec:
+  mounts:
+    - mountPoint: https://mirrors.bit.edu.cn/apache/hbase/stable/
+      name: hbase
+---
+apiVersion: data.fluid.io/v1alpha1
+kind: AlluxioRuntime
+metadata:
+  name: hbase
+spec:
+  replicas: 2
+  tieredstore:
+    levels:
+      - mediumtype: MEM
+        path: /dev/shm
+        quota: 2Gi
+        high: "0.95"
+        low: "0.7"
+EOF
+```
+
+```
+$ kubectl create -f old_dataset.yaml
+dataset.data.fluid.io/hbase created
+alluxioruntime.data.fluid.io/hbase created
+```
+
+检查Alluxio Pod状态:
+```
+$ kubectl get pod -l release=hbase
+NAME                 READY   STATUS              RESTARTS   AGE
+hbase-fuse-6fkrj     0/1     ContainerCreating   0          38s
+hbase-fuse-rwbr6     1/1     Running             0          39s
+hbase-master-0       2/2     Running             0          67s
+hbase-worker-dxxzl   0/2     ContainerCreating   0          38s
+hbase-worker-tj8xb   2/2     Running             0          39s
+```
+
+### 升级Fluid
+
+**使用Helm升级Fluid**
+
+```
+$ helm upgrade fluid /fluid/charts/fluid/fluid
+```
+
+**升级Fluid CRDs**
+```
+$ kubectl apply -f /fluid/charts/fluid/fluid/crds
+```
+
+### 新版本下创建Dataset
+
+**创建Dataset**
+
+在不删除旧版本下创建的Dataset的同时，创建一个新的Dataset，使两者共存
+
+```
+$ cat << EOF > new_dataset.yaml
+apiVersion: data.fluid.io/v1alpha1
+kind: Dataset
+metadata:
+  name: another-hbase
+spec:
+  mounts:
+    - mountPoint: https://mirrors.bit.edu.cn/apache/hbase/stable/
+      name: hbase
+---
+apiVersion: data.fluid.io/v1alpha1
+kind: AlluxioRuntime
+metadata:
+  name: another-hbase
+spec:
+  replicas: 2
+  tieredstore:
+    levels:
+      - mediumtype: MEM
+        path: /dev/shm
+        quota: 2Gi
+        high: "0.95"
+        low: "0.7"
+EOF
+```
+
+```
+$ kubectl create -f new_dataset.yaml
+dataset.data.fluid.io/another-hbase created
+alluxioruntime.data.fluid.io/another-hbase created
+```
+
+### 访问Dataset中数据
+
+**访问旧版本Dataset中数据**
+
+```
+$ cat << EOF > old_nginx.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+spec:
+  containers:
+    - name: nginx
+      image: nginx
+      volumeMounts:
+        - mountPath: /data
+          name: hbase-vol
+  volumes:
+    - name: hbase-vol
+      persistentVolumeClaim:
+        claimName: hbase
+EOF
+```
+
+```
+$ kubectl create -f old_nginx.yaml
+```
+
+登录进入创建的Nginx Pod，应当发现能够正常访问旧版本Dataset中的数据
+
+```
+$ kubectl exec -it nginx bash
+
+$ ls -lR /data/
+
+$ cp -r /data/ ./
+```
+
+**访问新版本Dataset中数据**
+
+```
+$ cat << EOF > new_nginx.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: another-nginx
+spec:
+  containers:
+    - name: nginx
+      image: nginx
+      volumeMounts:
+        - mountPath: /data
+          name: hbase-vol
+  volumes:
+    - name: hbase-vol
+      persistentVolumeClaim:
+        claimName: another-hbase
+EOF
+```
+
+```
+$ kubectl create -f new_nginx.yaml
+pod/another-nginx created
+```
+
+登录进入创建的Nginx Pod，应当发现能够正常访问新版本Dataset中的数据
+
+```
+$ kubectl exec -it another-nginx bash
+
+$ ls -lR /data
+
+$ cp -r /data ./
+```
+
+### 环境清理
+
+**删除旧版本Dataset**
+
+```
+$ kubectl delete pod nginx
+
+$ kubectl delete dataset hbase
+```
+应当发现，Nginx Pod和旧版本Dataset均正常删除，且绑定的AlluxioRuntime也被级联删除。
+
+**删除新版本Dataset**
+```
+$ kubectl delete pod another-nginx
+
+$ kubectl delete dataset another-hbase
+```
+
+应当发现，Nginx Pod和新版本Dataset均正常删除，且绑定的AlluxioRuntime也被级联删除。
+
 ## 9-Fuse客户端全局部署模式下扩容AlluxioRuntime
+
 
 ### 查看节点信息
 
