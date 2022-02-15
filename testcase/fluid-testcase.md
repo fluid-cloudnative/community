@@ -62,6 +62,11 @@
     - [查看alluxio-worker所在节点](#查看alluxio-worker所在节点)
     - [创建Nginx容器](#创建nginx容器)
     - [扩容AlluxioRuntime](#扩容alluxioruntime)
+  - [10-使用JindoRuntime访问OSS对象存储数据](#10-使用jindoruntime访问oss对象存储数据)
+    - [准备工作](#准备工作-3)
+    - [创建Dataset和JindoRuntime](#创建dataset和jindoruntime)
+    - [通过Dataset访问数据](#通过dataset访问数据-1)
+    - [环境清理](#环境清理-3)
 
 ## 1-安装fluid
 
@@ -300,7 +305,7 @@ nginx              1/1     Running   0          13m   10.5.0.14     cn-beijing.1
 ```
 $ kubectl exec -it nginx bash
 
-$ ls -lR /data/
+root@nginx:/# ls -lR /data/
 /data/:
 total 1
 dr--r----- 1 root root 6 Feb 14 07:38 hbase
@@ -314,7 +319,7 @@ total 579807
 -r--r----- 1 root root 272026535 Dec 18 03:35 hbase-2.4.9-client-bin.tar.gz
 -r--r----- 1 root root  37038972 Dec 18 03:35 hbase-2.4.9-src.tar.gz
 
-$ time cp -r /data/hbase ./
+root@nginx:/# time cp -r /data/hbase ./
 
 real    1m30.605s
 user    0m0.005s
@@ -1570,3 +1575,144 @@ kubectl get pod -o custom-columns=NAME:metadata.name,NAME:.spec.nodeName | grep 
 ```
 
 可以看到，新建的alluxio-worker将依次被调度到node2~5。
+
+## 10-使用JindoRuntime访问OSS对象存储数据
+
+### 准备工作
+
+**安装Fluid时启用JindoRuntime**
+
+```
+$ kubectl create ns fluid-system
+
+$ helm install --set runtime.jindo.enabled=true fluid /fluid/charts/fluid/fluid
+```
+
+```
+$ kubectl get pod -n fluid-system
+...
+jindoruntime-controller-6559bb466-2x8tm      1/1     Running   0          2m13s
+```
+应当发现，存在jindoruntime controller pod处于Running状态
+
+**准备OSS对象存储**
+
+1. 记录接下来需要访问的OSS Bucket的访问端点信息`OSS_BUCKET_ENDPOINT`
+2. 获取`ACCESS_KEY_ID`和`ACCESS_KEY_SECRET`信息
+
+**创建Secret存储上述访问凭证**
+
+```
+$ cat << EOF > secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysecret
+stringData:
+  fs.oss.accessKeyId: <ACCESS_KEY_ID>
+  fs.oss.accessKeySecret: <ACCESS_KEY_SECRET>
+EOF
+```
+
+```
+$ kubectl create -f secret.yaml
+```
+
+### 创建Dataset和JindoRuntime
+
+```
+$ cat << EOF > dataset.yaml
+apiVersion: data.fluid.io/v1alpha1
+kind: Dataset
+metadata:
+  name: oss-bucket
+spec:
+  mounts:
+    - mountPoint: oss://<OSS_BUCKET_NAME>
+      options:
+        fs.oss.endpoint: <OSS_BUCKET_ENDPOINT>
+      name: ossbucket
+      encryptOptions:
+        - name: fs.oss.accessKeyId
+          valueFrom:
+            secretKeyRef:
+              name: mysecret
+              key: fs.oss.accessKeyId
+        - name: fs.oss.accessKeySecret
+          valueFrom:
+            secretKeyRef:
+              name: mysecret
+              key: fs.oss.accessKeySecret
+---
+apiVersion: data.fluid.io/v1alpha1
+kind: JindoRuntime
+metadata:
+  name: oss-bucket
+spec:
+  replicas: 1
+  tieredstore:
+    levels:
+      - mediumtype: MEM
+        path: /dev/shm
+        quota: 10G
+        high: "0.99"
+        low: "0.98"
+EOF
+```
+
+```
+$ kubectl create -f dataset.yaml
+dataset.data.fluid.io/oss-bucket created
+jindoruntime.data.fluid.io/oss-bucket created
+```
+
+### 通过Dataset访问数据
+
+等待[Dataset状态变为Bound](#检查dataset和alluxioruntime状态)后，创建Pod访问OSS Bucket中数据
+
+```
+$ cat << EOF > nginx.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+spec:
+  containers:
+    - name: nginx
+      image: nginx
+      volumeMounts:
+        - mountPath: /data
+          name: oss-vol
+  volumes:
+    - name: oss-vol
+      persistentVolumeClaim:
+        claimName: oss-bucket
+EOF
+```
+
+```
+$ kubectl create -f nginx.yaml
+pod/nginx created
+```
+
+登录到Nginx Pod中，应当发现可以访问OSS中数据:
+
+```
+$ kubectl exec -it nginx bash
+
+root@nginx:/# ls -lR /data/jindo
+
+root@nginx:/# cp -lR /data/jindo ./
+```
+
+### 环境清理
+
+**删除Nginx Pod**
+```
+$ kubectl delete -f nginx.yaml
+```
+
+**删除Dataset和JindoRuntime**
+```
+$ kubectl delete -f dataset.yaml
+```
