@@ -51,6 +51,10 @@
     - [新版本下创建Dataset](#新版本下创建dataset)
     - [访问Dataset中数据](#访问dataset中数据)
     - [环境清理](#环境清理-2)
+  - [8-设置AlluxioRuntime各组件Pod的资源需求](#8-设置alluxioruntime各组件pod的资源需求)
+    - [创建带资源需求的AlluxioRuntime](#创建带资源需求的alluxioruntime)
+    - [使用Dataset访问数据](#使用dataset访问数据)
+    - [检查Alluxio各组件资源需求](#检查alluxio各组件资源需求)
   - [9-Fuse客户端全局部署模式下扩容AlluxioRuntime](#9-fuse客户端全局部署模式下扩容alluxioruntime)
     - [查看节点信息](#查看节点信息)
     - [创建Dataset](#创建dataset)
@@ -1257,6 +1261,181 @@ $ kubectl delete dataset another-hbase
 ```
 
 应当发现，Nginx Pod和新版本Dataset均正常删除，且绑定的AlluxioRuntime也被级联删除。
+
+## 8-设置AlluxioRuntime各组件Pod的资源需求
+
+### 创建带资源需求的AlluxioRuntime
+
+```
+$ cat << EOF > dataset.yaml
+apiVersion: data.fluid.io/v1alpha1
+kind: Dataset
+metadata:
+  name: hbase
+spec:
+  mounts:
+    - mountPoint: https://mirrors.bit.edu.cn/apache/hbase/stable/
+      name: hbase
+---
+apiVersion: data.fluid.io/v1alpha1
+kind: AlluxioRuntime
+metadata:
+  name: hbase
+spec:
+  replicas: 1
+  tieredstore:
+    levels:
+      - mediumtype: MEM
+        path: /dev/shm
+        quota: 2Gi
+        high: "0.95"
+        low: "0.7"
+  master:
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 4Gi
+      limits:
+        cpu: 2000m
+        memory: 8Gi
+  jobMaster:
+    resources:
+      requests:
+        cpu: 1500m
+        memory: 4Gi
+      limits:
+        cpu: 2000m
+        memory: 8Gi
+  worker:
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 4Gi
+      limits:
+        cpu: 2000m
+        memory: 8Gi
+  jobWorker:
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 4Gi
+      limits:
+        cpu: 2000m
+        memory: 8Gi
+  fuse:
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 4Gi
+      limits:
+        cpu: 2000m
+        memory: 8Gi
+EOF
+```
+
+```
+$ kubectl create -f dataset.yaml
+dataset.data.fluid.io/hbase created
+alluxioruntime.data.fluid.io/hbase created
+```
+
+### 使用Dataset访问数据
+
+创建使用该Dataset的Pod，使Alluxio Fuse Pod被启动
+```
+$ cat << EOF > pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+spec:
+  containers:
+    - name: nginx
+      image: nginx
+      volumeMounts:
+        - mountPath: /data
+          name: hbase-vol
+  volumes:
+    - name: hbase-vol
+      persistentVolumeClaim:
+        claimName: hbase
+```
+
+```
+$ kubectl create -f pod.yaml
+```
+
+### 检查Alluxio各组件资源需求
+
+**Alluxio Master Pod**
+
+```
+$ kubectl get pod hbase-master-0 -o=jsonpath='{@.spec.containers[*].resources}' | jq
+{
+  "limits": {
+    "cpu": "2",
+    "memory": "8Gi"
+  },
+  "requests": {
+    "cpu": "1",
+    "memory": "4Gi"
+  }
+}
+{
+  "limits": {
+    "cpu": "2",
+    "memory": "8Gi"
+  },
+  "requests": {
+    "cpu": "1500m",
+    "memory": "4Gi"
+  }
+}
+```
+
+**Alluxio Worker Pod**
+```
+$ kubectl get pod hbase-worker-0 -o=jsonpath='{@.spec.containers[*].resources}' | jq
+{
+  "limits": {
+    "cpu": "2",
+    "memory": "10Gi"
+  },
+  "requests": {
+    "cpu": "1",
+    "memory": "4Gi"
+  }
+}
+{
+  "limits": {
+    "cpu": "2",
+    "memory": "8Gi"
+  },
+  "requests": {
+    "cpu": "1",
+    "memory": "4Gi"
+  }
+}
+```
+
+**Alluxio Fuse Pod**
+
+```
+$ kubectl get pod hbase-fuse-4stx5 -o=jsonpath='{@.spec.containers[*].resources}' | jq
+{
+  "limits": {
+    "cpu": "2",
+    "memory": "10Gi"
+  },
+  "requests": {
+    "cpu": "1",
+    "memory": "4Gi"
+  }
+}
+```
+
+应当发现Alluxio各组件Pod的资源需求均正确设置。
+
 
 ## 9-Fuse客户端全局部署模式下扩容AlluxioRuntime
 
