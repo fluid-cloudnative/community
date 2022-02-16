@@ -11,26 +11,17 @@
     - [卸载旧版本的fluid](#卸载旧版本的fluid)
     - [安装fluid](#安装fluid)
     - [检查fluid运行状态](#检查fluid运行状态)
-  - [2-创建Dataset](#2-创建dataset)
-    - [创建Dataset对应的yaml文件](#创建dataset对应的yaml文件)
-    - [创建Dataset](#创建dataset)
-  - [3-创建AlluxioRuntime](#3-创建alluxioruntime)
-    - [创建AlluxioRuntime对应的yaml文件](#创建alluxioruntime对应的yaml文件)
-    - [创建AlluxioRuntime](#创建alluxioruntime)
-    - [检查AlluxioRuntime对应的pod是否正常运行](#检查alluxioruntime对应的pod是否正常运行)
-    - [检查PV和PVC是否正常创建](#检查pv和pvc是否正常创建)
-  - [4-判断Dataset是否bound](#4-判断dataset是否bound)
-    - [检查AlluxioRuntime是否Ready](#检查alluxioruntime是否ready)
-    - [检查Dataset是否bound](#检查dataset是否bound)
-  - [5-删除Dataset](#5-删除dataset)
-  - [6-删除AlluxioRuntime](#6-删除alluxioruntime)
-  - [7-DataLoad数据预加载](#7-dataload数据预加载)
-    - [创建DataLoad对应的yaml文件](#创建dataload对应的yaml文件)
+  - [2-使用Dataset访问WebUFS](#2-使用dataset访问webufs)
+    - [创建Dataset和AlluxioRuntime](#创建dataset和alluxioruntime)
+    - [检查Dataset和AlluxioRuntime状态](#检查dataset和alluxioruntime状态)
+    - [通过Dataset访问数据](#通过dataset访问数据)
+    - [环境清理](#环境清理)
+  - [3-DataLoad数据预加载](#3-dataload数据预加载)
     - [创建DataLoad](#创建dataload)
-    - [检查DataLoad是否已经正常运行](#检查dataload是否已经正常运行)
+    - [检查DataLoad状态](#检查dataload状态)
     - [检查DataLoad是否执行成功](#检查dataload是否执行成功)
-    - [删除DataLoad](#删除dataload)
-  - [8-DataBackup数据备份](#8-databackup数据备份)
+    - [环境清理](#环境清理-1)
+  - [4-DataBackup数据备份](#4-databackup数据备份)
     - [备份到本地](#备份到本地)
       - [删除历史备份记录-local](#删除历史备份记录-local)
       - [创建DataBackup对应的yaml文件-local](#创建databackup对应的yaml文件-local)
@@ -43,24 +34,39 @@
       - [创建DataBackup-pvc](#创建databackup-pvc)
       - [检查DataBackup是否执行成功-pvc](#检查databackup是否执行成功-pvc)
     - [删除DataBackup](#删除databackup)
-  - [9-Fuse客户端全局部署模式下扩容AlluxioRuntime](#9-fuse客户端全局部署模式下扩容alluxioruntime)
-    - [查看节点信息](#查看节点信息)
-    - [创建Dataset](#创建dataset-1)
-    - [创建AlluxioRuntime](#创建alluxioruntime-1)
-    - [查看alluxio-worker所在节点](#查看alluxio-worker所在节点)
-    - [创建Nginx容器](#创建nginx容器)
-    - [扩容AlluxioRuntime](#扩容alluxioruntime)
-  - [10-同一runtime类型条件下不同并发场景使用Patch进行更新节点标签](#10-同一runtime类型条件下不同并发场景使用patch进行更新节点标签)
+  - [5-同一runtime类型条件下不同并发场景使用Patch进行更新节点标签](#5-同一runtime类型条件下不同并发场景使用patch进行更新节点标签)
     - [准备工作](#准备工作)
     - [多数据集并发调度到同一节点](#多数据集并发调度到同一节点)
     - [多数据集在同一节点并发调度与删除](#多数据集在同一节点并发调度与删除)
     - [多数据集在同一节点并发删除](#多数据集在同一节点并发删除)
-  - [11-Fuse挂载点自动恢复](#11-fuse挂载点自动恢复)
-    - [前置需求](#前置需求)
-    - [创建Dataset和AlluxioRuntime](#创建dataset和alluxioruntime)
+  - [6-Fuse挂载点自动恢复](#6-fuse挂载点自动恢复)
+    - [准备工作](#准备工作-1)
+    - [创建Dataset和AlluxioRuntime](#创建dataset和alluxioruntime-1)
     - [为Namespace开启Webhook自动注入能力](#为namespace开启webhook自动注入能力)
     - [创建业务Pod](#创建业务pod)
     - [Fuse挂载点自动恢复测试](#fuse挂载点自动恢复测试)
+  - [7-Fluid升级过程中使用Dataset](#7-fluid升级过程中使用dataset)
+    - [准备工作](#准备工作-2)
+    - [升级Fluid](#升级fluid)
+    - [新版本下创建Dataset](#新版本下创建dataset)
+    - [访问Dataset中数据](#访问dataset中数据)
+    - [环境清理](#环境清理-2)
+  - [8-设置AlluxioRuntime各组件Pod的资源需求](#8-设置alluxioruntime各组件pod的资源需求)
+    - [创建带资源需求的AlluxioRuntime](#创建带资源需求的alluxioruntime)
+    - [使用Dataset访问数据](#使用dataset访问数据)
+    - [检查Alluxio各组件资源需求](#检查alluxio各组件资源需求)
+  - [9-Fuse客户端全局部署模式下扩容AlluxioRuntime](#9-fuse客户端全局部署模式下扩容alluxioruntime)
+    - [查看节点信息](#查看节点信息)
+    - [创建Dataset](#创建dataset)
+    - [创建AlluxioRuntime](#创建alluxioruntime)
+    - [查看alluxio-worker所在节点](#查看alluxio-worker所在节点)
+    - [创建Nginx容器](#创建nginx容器)
+    - [扩容AlluxioRuntime](#扩容alluxioruntime)
+  - [10-使用JindoRuntime访问OSS对象存储数据](#10-使用jindoruntime访问oss对象存储数据)
+    - [准备工作](#准备工作-3)
+    - [创建Dataset和JindoRuntime](#创建dataset和jindoruntime)
+    - [通过Dataset访问数据](#通过dataset访问数据-1)
+    - [环境清理](#环境清理-3)
 
 ## 1-安装fluid
 
@@ -159,254 +165,292 @@ kubectl get pod -n fluid-system | grep csi-nodeplugin | awk '{print $3}'
 
 如果以上结果返回都正确，说明fluid在正常运行。
 
-## 2-创建Dataset
+## 2-使用Dataset访问WebUFS
 
-该节展示了如何创建一个Dataset，以名字为spark的Dataset为例。
+### 创建Dataset和AlluxioRuntime
 
-### 创建Dataset对应的yaml文件
-
-dataset.yaml文件的内容可以根据需要进行编辑。
-
+**创建Dataset CRD和AlluxioRuntime CRD描述文件**
 ```shell
-cat << EOF > dataset.yaml
+$ cat << EOF > dataset.yaml
 apiVersion: data.fluid.io/v1alpha1
 kind: Dataset
 metadata:
-  name: spark
+  name: hbase
 spec:
   mounts:
-    - mountPoint: https://mirror.bit.edu.cn/apache/spark/
-      name: spark
-EOF
-```
-
-### 创建Dataset
-
-输入以下命令创建Dataset。
-
-```shell
-kubectl create -f dataset.yaml
-```
-
-检查Dataset是否成功创建，输入以下命令输出`spark`。
-
-```shell
-kubectl get dataset | awk '{print $1}' | grep ^spark$
-```
-
-## 3-创建AlluxioRuntime
-
-该节展示了如何创建Dataset对应的AlluxioRuntime，同样以spark为例。
-
-### 创建AlluxioRuntime对应的yaml文件
-
-runtime.yaml文件的内容可以根据需要进行编辑。
-
-```shell
-cat << EOF > runtime.yaml 
+    - mountPoint: https://mirrors.bit.edu.cn/apache/hbase/stable/
+      name: hbase
+---
 apiVersion: data.fluid.io/v1alpha1
 kind: AlluxioRuntime
 metadata:
-  name: spark
+  name: hbase
 spec:
-  replicas: 1
+  replicas: 2
   tieredstore:
     levels:
       - mediumtype: MEM
         path: /dev/shm
-        quota: 4Gi
+        quota: 2Gi
         high: "0.95"
         low: "0.7"
-  properties:
-    alluxio.user.block.size.bytes.default: 256MB
-    alluxio.user.streaming.reader.chunk.size.bytes: 256MB
-    alluxio.user.local.reader.chunk.size.bytes: 256MB
-    alluxio.worker.network.reader.buffer.size: 256MB
-    alluxio.user.streaming.data.timeout: 300sec
-  fuse:
-    args:
-      - fuse
-      - --fuse-opts=kernel_cache,ro,max_read=131072,attr_timeout=7200,entry_timeout=7200,nonempty,max_readahead=0
 EOF
 ```
 
-### 创建AlluxioRuntime
-
-输入以下命令创建AlluxioRuntime。
-
-```shell
-kubectl create -f runtime.yaml
+**创建Dataset和AlluxioRuntime**
+```
+$ kubectl create -f dataset.yaml
+dataset.data.fluid.io/hbase created
+alluxioruntime.data.fluid.io/hbase created
 ```
 
-检查Dataset是否成功创建，输入以下命令输出`spark`。
+### 检查Dataset和AlluxioRuntime状态
 
-```shell
-kubectl get alluxioruntime | awk '{print $1}' | grep ^spark$
+**检查Dataset状态**
+```
+$ kubectl get dataset hbase
+NAME    UFS TOTAL SIZE   CACHED   CACHE CAPACITY   CACHED PERCENTAGE   PHASE      AGE
+hbase   [Calculating]                                                  NotBound   35s
+```
+此时Dataset处于未绑定(NotBound)状态，即Alluxio仍然在启动中
+
+一段时间后，Alluxio正常启动，Dataset状态变为已绑定(Bound)状态
+```
+$ kubectl get dataset hbase
+NAME    UFS TOTAL SIZE   CACHED      CACHE CAPACITY   CACHED PERCENTAGE   PHASE   AGE
+hbase   566.22MiB        566.22MiB   4.00GiB          100.0%              Bound   6m14s
 ```
 
-### 检查AlluxioRuntime对应的pod是否正常运行
-
-查看master，输入以下命令，如果master正常运行，返回`Running`。
-
-```shell
-kubectl get pod | grep spark-master | awk '{print $3}'
+**检查AlluxioRuntime状态**
 ```
-
-查看worker，输入以下命令，如果workers正常运行，返回`Running`，`Running`的个数应该和AlluxioRuntime.spec.replicas属性一致。
-
-```shell
-kubectl get pod | grep spark-worker | awk '{print $3}'
+$ kubectl get alluxioruntime hbase
+NAME    MASTER PHASE   WORKER PHASE   FUSE PHASE   AGE
+hbase   Ready          Ready          Ready        8m3s
 ```
+应当发现Alluxio的各个组件(Alluxio Master, Alluxio Worker, Alluxio Fuse)均为Ready状态
 
-查看fuse，输入以下命令，如果fuse正常运行，返回`Running`，`Running`的个数应该和AlluxioRuntime.spec.replicas属性一致。
-
-```shell
-kubectl get pod | grep spark-fuse | awk '{print $3}'
+**检查创建的PV,PVC**
 ```
+$ kubectl get pv,pvc
+NAME                             CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM           STORAGECLASS   REASON   AGE
+persistentvolume/default-hbase   100Gi      ROX            Retain           Bound    default/hbase   fluid                   9m13s
+
+NAME                          STATUS   VOLUME          CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+persistentvolumeclaim/hbase   Bound    default-hbase   100Gi      ROX            fluid          9m13s
+```
+应当发现与Dataset相关的PV和PVC被成功创建:
+- PV名为"{Dataset命名空间}-{Dataset名}"，例如`default-hbase`
+- PVC名为"{Dataset名}",例如`hbase`
+- PVC绑定的Volume为"{Dataset命名空间}-{Dataset名}"
+
+**检查AlluxioRuntime对应的Pod是否正常运行**
+
+```
+$ kubectl get pod -l release=hbase
+NAME             READY   STATUS    RESTARTS   AGE
+hbase-master-0   2/2     Running   0          18m
+hbase-worker-0   2/2     Running   0          17m
+hbase-worker-1   2/2     Running   0          17m
+```
+应当发现:
+- 全部Pod正常运行，处于Running状态，且RESTARTS均为0
+- 包含1个Alluxio Master Pod(`hbase-master-0`)
+- 包含2各Alluxio Worker Pod(`hbase-worker-X`)
+- 不包含Alluxio Fuse Pod
 
 如果以上条件都满足，说明AlluxioRuntime正常运行。
 
-### 检查PV和PVC是否正常创建
+### 通过Dataset访问数据
 
-查看PV是否正常创建，输入以下命令，如果PV正常创建，返回`Bound`。
+**创建Nginx Pods**
 
-```shell
-kubectl get pv | awk '$1=="spark" && $7=="fluid" {print $5}'
+```
+$ cat << EOF > nginx.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+spec:
+  containers:
+    - name: nginx
+      image: nginx
+      volumeMounts:
+        - mountPath: /data
+          name: hbase-vol
+  volumes:
+    - name: hbase-vol
+      persistentVolumeClaim:
+        claimName: hbase
 ```
 
-查看PVC是否正常创建，输入以下命令，如果PVC正常创建，返回`Bound`。
-
-```shell
-kubectl get pvc | awk '$1=="spark" && $3=="spark" && $6=="fluid" {print $2}'
+```
+$ kubectl create -f nginx.yaml
+pod/nginx created
 ```
 
-如果以上条件都满足，说明fluid成功创建了PV和PVC。
+**检查Alluxio Fuse Pod状态**
+```
+$ kubectl get pod -o wide
+NAME               READY   STATUS    RESTARTS   AGE   IP            NODE                     NOMINATED NODE   READINESS GATES
+hbase-fuse-5qqb4   1/1     Running   0          13m   172.16.0.26   cn-beijing.172.16.0.26   <none>           <none>
+hbase-master-0     2/2     Running   0          51m   172.16.0.27   cn-beijing.172.16.0.27   <none>           <none>
+hbase-worker-0     2/2     Running   0          50m   172.16.0.27   cn-beijing.172.16.0.27   <none>           <none>
+hbase-worker-1     2/2     Running   0          50m   172.16.0.26   cn-beijing.172.16.0.26   <none>           <none>
+nginx              1/1     Running   0          13m   10.5.0.14     cn-beijing.172.16.0.26   <none>           <none>
+```
+应当发现，Alluxio Fuse Pod(`hbase-fuse-xxxxx`)正常运行，并且与Nginx Pod在同一节点
 
-## 4-判断Dataset是否bound
 
-### 检查AlluxioRuntime是否Ready
+**登录到Nginx Pod容器中并访问数据**
+```
+$ kubectl exec -it nginx bash
 
-检查Master是否Ready，Ready返回`Ready`。
+root@nginx:/# ls -lR /data/
+/data/:
+total 1
+dr--r----- 1 root root 6 Feb 14 07:38 hbase
 
-```shell
-kubectl get alluxioruntime | awk '$1=="spark"{print $2}'
+/data/hbase:
+total 579807
+-r--r----- 1 root root    101357 Dec 18 03:35 CHANGES.md
+-r--r----- 1 root root   1058578 Dec 18 03:35 RELEASENOTES.md
+-r--r----- 1 root root         0 Dec 18 03:35 api_compare_2.4.8_to_2.4.9RC0.html
+-r--r----- 1 root root 283496242 Dec 18 03:35 hbase-2.4.9-bin.tar.gz
+-r--r----- 1 root root 272026535 Dec 18 03:35 hbase-2.4.9-client-bin.tar.gz
+-r--r----- 1 root root  37038972 Dec 18 03:35 hbase-2.4.9-src.tar.gz
+
+root@nginx:/# time cp -r /data/hbase ./
+
+real    1m30.605s
+user    0m0.005s
+sys     0m1.177s
+```
+应当发现:
+1. 能够正常访问文件元信息（`ls -lR`）
+2. 能够读取文件数据（`cp -r /data/hbase`）
+
+### 环境清理
+
+**删除Nginx Pod**
+
+```
+$ kubectl delete -f nginx.yaml
+pod "nginx" deleted
 ```
 
-检查Worker是否Ready，Ready返回`Ready`。
+**检查Alluxio Pod状态**
 
-```shell
-kubectl get alluxioruntime | awk '$1=="spark"{print $3}'
+```
+$ kubectl get pod -l release=hbase
+NAME               READY   STATUS    RESTARTS   AGE
+hbase-fuse-5qqb4   1/1     Running   0          19m
+hbase-master-0     2/2     Running   0          57m
+hbase-worker-0     2/2     Running   0          56m
+hbase-worker-1     2/2     Running   0          56m
+```
+应当发现Alluxio Fuse Pod没有随Nginx Pod被删除而被删除
+
+**删除Dataset**
+
+```
+$ kubectl delete dataset hbase
+dataset.data.fluid.io "hbase" deleted
 ```
 
-检查Fuse是否Ready，Ready返回`Ready`。
+由于Dataset被删除，其绑定的AlluxioRuntime也会被级联删除
 
-```shell
-kubectl get alluxioruntime | awk '$1=="spark"{print $4}'
+```
+$ kubectl get alluxioruntime
+No resources found in default namespace.
+
+$ kubectl get pod -l release=hbase
+No resources found in default namespace.
 ```
 
-如果以上条件都满足，说明AlluxioRuntime已经Ready。
+一段时间后，应当发现，AlluxioRuntime与Alluxio Pods均被删除
 
-### 检查Dataset是否bound
 
-检查Dataset是否bound，bound返回`Bound`。
+## 3-DataLoad数据预加载
 
-```shell
-kubectl get dataset | awk '$1=="spark"{print $6}'
-```
+本节展示了如何借助DataLoad进行数据预加载，同样以hbase数据集为例。首先创建好相应的Dataset和AlluxioRuntime。
 
-## 5-删除Dataset
+1. [创建Dataset和AlluxioRuntime](#创建dataset和alluxioruntime)
 
-输入以下命令删除Dataset。
-
-```shell
-kubectl delete dataset spark
-```
-
-检查Dataset是否被删除，输入以下命令输出空或者`No resources found in default namespace.`。
-
-```shell
-kubectl get dataset | awk '$1=="spark"'
-```
-
-检查AlluxioRuntime是否被删除，输入以下命令输出空或者`No resources found in default namespace.`。
-
-```shell
-kubectl get alluxioruntime | awk '$1=="spark"'
-```
-
-## 6-删除AlluxioRuntime
-
-输入以下命令删除AlluxioRuntime。
-
-```shell
-kubectl delete alluxioruntime spark
-```
-
-检查AlluxioRuntime是否被删除，输入以下命令输出空或者`No resources found in default namespace.`。
-
-```shell
-kubectl get alluxioruntime | awk '$1=="spark"'
-```
-
-## 7-DataLoad数据预加载
-
-本节展示了如何借助DataLoad进行数据预加载，同样以spark数据集为例。首先创建好相应的Dataset和AlluxioRuntime。
-
-1. [创建Dataset](#2.创建Dataset)
-
-2. [创建AlluxioRuntime](#3.创建AlluxioRuntime)
-
-3. [判断Dataset是否bound](#4.判断Dataset是否bound)
+2. [判断Dataset是否bound](#检查dataset和alluxioruntime状态)
 
 > 需要注意的是，创建DataLoad进行数据预加载并不需要Dataset处于bound的状态，这里多一步判断Dataset是否bound只是可以为后续出错排查提供方便。
 
-### 创建DataLoad对应的yaml文件
+**查看Dataset当前缓存的数据量**
 
-```shell
-cat << EOF > dataload.yaml
+```
+$ kubectl get dataset hbase
+NAME    UFS TOTAL SIZE   CACHED   CACHE CAPACITY   CACHED PERCENTAGE   PHASE   AGE
+hbase   566.22MiB        0.00B    4.00GiB          0.0%                Bound   9m41s
+```
+应当发现，初始时没有缓存任何数据（`Cached=0.00B`）
+
+### 创建DataLoad
+
+```
+$ cat << EOF > dataload.yaml
 apiVersion: data.fluid.io/v1alpha1
 kind: DataLoad
 metadata:
-  name: spark-dataload
+  name: hbase-dataload
 spec:
   dataset:
-    name: spark
+    name: hbase
     namespace: default
 EOF
 ```
 
-### 创建DataLoad
-
 输入以下命令创建DataLoad。
 
-```shell
-kubectl create -f dataload.yaml
+```
+$ kubectl create -f dataload.yaml
+dataload.data.fluid.io/hbase-dataload created
 ```
 
-检查DataLoad是否成功创建，如果创建成功，输入以下命令输出DataLoad的名字`spark-dataload`。
+### 检查DataLoad状态
 
-```shell
-kubectl get dataload | awk '{print $1}' | grep ^spark-dataload$
+**检查DataLoad是否已经创建Job**
+
+```
+$ kubectl get job | awk '$1=="hbase-dataload-loader-job"'
+hbase-dataload-loader-job   0/1           52s        65s
+```
+应当发现名为`hbase-dataload-loader-job`存在
+
+**检查DataLoad对应的Pod的状态**
+
+```
+$ kubectl get pod -l release=hbase-dataload-loader
+NAME                              READY   STATUS      RESTARTS   AGE
+hbase-dataload-loader-job-rmkxx   0/1     Running 0          1m6s
 ```
 
-### 检查DataLoad是否已经正常运行
+应当发现DataLoad对应的Pod处于`Running`状态。
 
-检查DataLoad是否已经创建Job，成功创建Job输入以下命令输出不为空。
-
-```shell
-kubectl get job | awk '$1=="spark-dataload-loader-job"'
+```
+$ kubectl get dataload hbase-dataload
+NAME             DATASET   PHASE      AGE     DURATION
+hbase-dataload   hbase     Loading    6m32s   
 ```
 
-检查DataLoad对应的Pod的状态，正常运行应该返回`Running`。
+应当发现DataLoad处于`Loading`状态。
 
-```shell
-kubectl get pod | grep ^spark-dataload-loader | awk '{print $3}'
+如果Dataset的size很小的话，加载数据操作会很快完成，完成后DataLoad对应的Pod变为`Completed`状态。
+
+```
+$ kubectl get pod -l release=hbase-dataload-loader
+NAME                              READY   STATUS      RESTARTS   AGE
+hbase-dataload-loader-job-rmkxx   0/1     Completed   0          3m6s
 ```
 
-检查DataLoad是否已经开始运行，输入以下命令返回`Pending`或者`Loading`，如果Dataset的size很小的话，加载数据操作会很快完成，也有可能返回`Complete`或者`Failed`，出现以上几种状态之一都能够说明DataLoad已经在正常运行了。
-
-```shell
-kubectl get dataload | awk '$1=="spark-dataload" {print $3}'
+```
+$ kubectl get dataloads.data.fluid.io
+NAME             DATASET   PHASE      AGE     DURATION
+hbase-dataload   hbase     Complete   6m32s   57s
 ```
 
 ### 检查DataLoad是否执行成功
@@ -414,54 +458,59 @@ kubectl get dataload | awk '$1=="spark-dataload" {print $3}'
 检查DataLoad创建的Job的状态，执行成功，输入以下命令返回`Complete`，执行失败，返回`Failed`。如果Job未执行结束，返回空。
 
 ```shell
-kubectl get job spark-dataload-loader-job -o jsonpath={.status.conditions[0].type}
+$ kubectl get job hbase-dataload-loader-job -o jsonpath={.status.conditions[0].type}
 ```
 
 检查DataLoad是否执行成功，如果执行成功，输入以下命令返回`Complete`，如果失败，返回`Failed`。如果DataLoad未结束，输出`Pending`或者`Loading`。
 
 ```shell
-kubectl get dataload | awk '$1=="spark-dataload" {print $3}'
+$ kubectl get dataload | awk '$1=="hbase-dataload" {print $3}'
 ```
 
-检查Dataset的数据是否被缓存，输入以下命令返回缓存比例，正常情况下，在有缓存能力的情况下，缓存比例应该大于0。本例中，DataLoad执行结束后输出`100.0%`。
+**检查Dataset的数据是否被缓存**
 
 ```shell
-kubectl get dataset | awk '$1=="spark" {print $5}'
+$ kubectl get dataset hbase
+NAME    UFS TOTAL SIZE   CACHED      CACHE CAPACITY   CACHED PERCENTAGE   PHASE   AGE
+hbase   566.22MiB        566.22MiB   4.00GiB          100.0%              Bound   30m
+```
+应当看到，Dataset的缓存占比(`Cached Percentage`)从`0.0%`变为`100.0%`,说明全部数据均已被缓存
+
+### 环境清理
+
+**删除DataLoad**
+
+```
+$ kubectl delete dataload hbase-dataload
+dataload.data.fluid.io "hbase-dataload" deleted
 ```
 
-如果以上命令都是成功状态，说明DataLoad执行成功且正常加载了数据，否则说明加载数据失败。
+**检查DataLoad对应的Job和Pod**
 
-### 删除DataLoad
-
-输入以下命令删除DataLoad。
-
-```shell
-kubectl delete dataload spark-dataload
+```
+$ kubectl get job
+No resources found in default namespace.
 ```
 
-检查DataLoad是否删除，如果DataLoad已经正常删除，输入以下命令输出为空或者`No resources found in default namespace.`。
-
-```shell
-kubectl get dataload | awk '$1=="spark-dataload"'
+```
+$ kubectl get pod -l release=hbase-dataload-loader
+No resources found in default namespace.
 ```
 
-检查DataLoad创建的Job是否删除，如果DataLoad已经正常删除，输入以下命令输出为空或者`No resources found in default namespace.`。
+**删除Dataset**
 
-```shell
-kubectl get job | awk '{print $1}' | grep ^spark-dataload-loader-job
+```
+$ kubectl delete dataset hbase
+dataset.data.fluid.io "hbase" deleted
 ```
 
-如果以上条件都满足，说明DataLoad已经成功删除。需要注意的是，当DataLoad对应的Dataset删除之后，DataLoad会被级联删除。
-
-## 8-DataBackup数据备份
+## 4-DataBackup数据备份
 
 该节展示了如何借助DataBackup对Dataset进行数据备份，同样以spark数据集为例。首先要创建Dataset和对应的AlluxioRuntime，同时确保Dataset已经处于bound状态。
 
-1. [创建Dataset](#2.创建Dataset)
+1. [创建Dataset和AlluxioRuntime](#创建dataset和alluxioruntime)
 
-2. [创建AlluxioRuntime](#3.创建AlluxioRuntime)
-
-3. [判断Dataset是否bound](#4.判断Dataset是否bound)
+2. [判断Dataset是否bound](#Dataset是否bound)
 
 ### 备份到本地
 
@@ -694,141 +743,9 @@ kubectl delete databackup spark-backup-local
 kubectl get databackup | awk '$1=="spark-backup-local"'
 ```
 
-## 9-Fuse客户端全局部署模式下扩容AlluxioRuntime
-
-### 查看节点信息
-
-查看集群中有哪些节点：
-
-```shell
-kubectl get nodes
-```
-
-本测试用例需要至少5个节点才能完成测试。下面将分别称呼它们为node1~node5。
-
-为node1~node4打上标签：
-
-```shell
-kubectl label node <nodeName> fuse=true
-```
-
-### 创建Dataset
-
-检查待创建的Dataset对象：
-
-```shell
-$ cat<<EOF >dataset.yaml
-apiVersion: data.fluid.io/v1alpha1
-kind: Dataset
-metadata:
-  name: hbase
-spec:
-  mounts:
-    - mountPoint: https://mirrors.tuna.tsinghua.edu.cn/apache/hbase/stable/
-      name: hbase
-EOF
-```
-
-创建Dataset：
-
-```shell
-kubectl create -f dataset.yaml
-```
-
-### 创建AlluxioRuntime
-
-检查待创建的AlluxioRuntime对象：
-
-```
-cat<<EOF >runtime-node-selector.yaml
-apiVersion: data.fluid.io/v1alpha1
-kind: AlluxioRuntime
-metadata:
-  name: hbase
-spec:
-  replicas: 1
-  tieredstore:
-    levels:
-      - mediumtype: MEM
-        path: /dev/shm
-        quota: 2Gi
-        high: "0.95"
-        low: "0.7"
-  properties:
-    alluxio.user.block.size.bytes.default: 256MB
-    alluxio.user.streaming.reader.chunk.size.bytes: 256MB
-    alluxio.user.local.reader.chunk.size.bytes: 256MB
-    alluxio.worker.network.reader.buffer.size: 256MB
-    alluxio.user.streaming.data.timeout: 300sec
-  fuse:
-    global: true
-    nodeSelector:
-      fuse: true
-    args:
-      - fuse
-      - --fuse-opts=kernel_cache,ro,max_read=131072,attr_timeout=7200,entry_timeout=7200,nonempty,max_readahead=0
-EOF
-```
-该配置文件中，fuse设置为了全局模式，fuse客户端会运行在刚刚打了标签的node1~node4上。
-
-创建AlluxioRuntime：
-
-```shell
-kubectl create -f runtime.yaml
-```
-
-### 查看alluxio-worker所在节点
-
-查看该Dataset对应的alluxio-worker所在节点：
-
-```shell
-kubectl get pod -o custom-columns=NAME:metadata.name,NAME:.spec.nodeName | grep hbase-worker
-```
-
-目前应该只有1副本，假设它所在的节点是node1。
-
-### 创建Nginx容器
-
-检查待创建的Pod对象：
-
-```shell
-apiVersion: v1
-kind: Pod
-metadata:
-  name: nginx
-spec:
-  containers:
-    - name: nginx
-      image: nginx
-      volumeMounts:
-        - mountPath: /data
-          name: hbasevol
-  nodeSelector:
-    kubernetes.io/hostname: <nodeName>
-  volumes:
-    - name: hbasevol
-      persistentVolumeClaim:
-        claimName: hbase
-```
-
-这样的Pod需要创建3个，前两个的hostname指定为node2，第三个的hostname指定为node3。
-
-这样，node2~4上将分别有2、1、0个正在使用该数据集的Pod。
-
-### 扩容AlluxioRuntime
-
-修改AlluxioRuntime的.spec.replicas，依次修改为2~5。
-
-每次修改后，都再次查看该Dataset对应的alluxio-worker所在节点：
-
-```shell
-kubectl get pod -o custom-columns=NAME:metadata.name,NAME:.spec.nodeName | grep hbase-worker
-```
-
-可以看到，新建的alluxio-worker将依次被调度到node2~5。
 
 
-## 10-同一runtime类型条件下不同并发场景使用Patch进行更新节点标签
+## 5-同一runtime类型条件下不同并发场景使用Patch进行更新节点标签
 该部分验证了在同一 runtime 类型条件下不同并发场景可以使用 patch 对节点进行添加标签和删除标签的功能。为了简化并发场景，可以在单个节点上进行实验。
 此时需要给特定的节点进行添加标签 fluid=multi-dataset ：
 ```shell
@@ -985,9 +902,9 @@ Labels:             ...
 
 这里需要注意的是目前该功能只支持同种类型的 runtime 进行并发的进行调度和删除，并不支持对于多种类型 runtime 进行同时调度和删除。
 
-## 11-Fuse挂载点自动恢复
+## 6-Fuse挂载点自动恢复
 
-### 前置需求
+### 准备工作
 
 正常安装Fluid v0.7.0+版本，并启用Fuse挂载点自动恢复功能:
 ```shell
@@ -1137,4 +1054,665 @@ kubectl exec -it nginx -- ls /data/hbase
 CHANGES.md                          hbase-2.4.9-bin.tar.gz
 RELEASENOTES.md                     hbase-2.4.9-client-bin.tar.gz
 api_compare_2.4.8_to_2.4.9RC0.html  hbase-2.4.9-src.tar.gz
+```
+
+## 7-Fluid升级过程中使用Dataset
+
+以下例子以Fluid v0.6升级至0.7为例，测试Fluid升级对使用Dataset过程是否有影响。
+
+### 准备工作
+
+**安装旧版本Fluid**
+
+```
+$ git clone https://github.com/fluid-cloudnative/fluid.git /fluid
+```
+
+```
+$ kubectl create ns fluid-system
+
+$ helm install fluid /fluid/charts/fluid/v0.6.0
+```
+
+**旧版本下使用Dataset**
+
+```
+$ cat << EOF > old_dataset.yaml
+apiVersion: data.fluid.io/v1alpha1
+kind: Dataset
+metadata:
+  name: hbase
+spec:
+  mounts:
+    - mountPoint: https://mirrors.bit.edu.cn/apache/hbase/stable/
+      name: hbase
+---
+apiVersion: data.fluid.io/v1alpha1
+kind: AlluxioRuntime
+metadata:
+  name: hbase
+spec:
+  replicas: 2
+  tieredstore:
+    levels:
+      - mediumtype: MEM
+        path: /dev/shm
+        quota: 2Gi
+        high: "0.95"
+        low: "0.7"
+EOF
+```
+
+```
+$ kubectl create -f old_dataset.yaml
+dataset.data.fluid.io/hbase created
+alluxioruntime.data.fluid.io/hbase created
+```
+
+检查Alluxio Pod状态:
+```
+$ kubectl get pod -l release=hbase
+NAME                 READY   STATUS              RESTARTS   AGE
+hbase-fuse-6fkrj     0/1     ContainerCreating   0          38s
+hbase-fuse-rwbr6     1/1     Running             0          39s
+hbase-master-0       2/2     Running             0          67s
+hbase-worker-dxxzl   0/2     ContainerCreating   0          38s
+hbase-worker-tj8xb   2/2     Running             0          39s
+```
+
+### 升级Fluid
+
+**使用Helm升级Fluid**
+
+```
+$ helm upgrade fluid /fluid/charts/fluid/fluid
+```
+
+**升级Fluid CRDs**
+```
+$ kubectl apply -f /fluid/charts/fluid/fluid/crds
+```
+
+### 新版本下创建Dataset
+
+**创建Dataset**
+
+在不删除旧版本下创建的Dataset的同时，创建一个新的Dataset，使两者共存
+
+```
+$ cat << EOF > new_dataset.yaml
+apiVersion: data.fluid.io/v1alpha1
+kind: Dataset
+metadata:
+  name: another-hbase
+spec:
+  mounts:
+    - mountPoint: https://mirrors.bit.edu.cn/apache/hbase/stable/
+      name: hbase
+---
+apiVersion: data.fluid.io/v1alpha1
+kind: AlluxioRuntime
+metadata:
+  name: another-hbase
+spec:
+  replicas: 2
+  tieredstore:
+    levels:
+      - mediumtype: MEM
+        path: /dev/shm
+        quota: 2Gi
+        high: "0.95"
+        low: "0.7"
+EOF
+```
+
+```
+$ kubectl create -f new_dataset.yaml
+dataset.data.fluid.io/another-hbase created
+alluxioruntime.data.fluid.io/another-hbase created
+```
+
+### 访问Dataset中数据
+
+**访问旧版本Dataset中数据**
+
+```
+$ cat << EOF > old_nginx.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+spec:
+  containers:
+    - name: nginx
+      image: nginx
+      volumeMounts:
+        - mountPath: /data
+          name: hbase-vol
+  volumes:
+    - name: hbase-vol
+      persistentVolumeClaim:
+        claimName: hbase
+EOF
+```
+
+```
+$ kubectl create -f old_nginx.yaml
+```
+
+登录进入创建的Nginx Pod，应当发现能够正常访问旧版本Dataset中的数据
+
+```
+$ kubectl exec -it nginx bash
+
+$ ls -lR /data/
+
+$ cp -r /data/ ./
+```
+
+**访问新版本Dataset中数据**
+
+```
+$ cat << EOF > new_nginx.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: another-nginx
+spec:
+  containers:
+    - name: nginx
+      image: nginx
+      volumeMounts:
+        - mountPath: /data
+          name: hbase-vol
+  volumes:
+    - name: hbase-vol
+      persistentVolumeClaim:
+        claimName: another-hbase
+EOF
+```
+
+```
+$ kubectl create -f new_nginx.yaml
+pod/another-nginx created
+```
+
+登录进入创建的Nginx Pod，应当发现能够正常访问新版本Dataset中的数据
+
+```
+$ kubectl exec -it another-nginx bash
+
+$ ls -lR /data
+
+$ cp -r /data ./
+```
+
+### 环境清理
+
+**删除旧版本Dataset**
+
+```
+$ kubectl delete pod nginx
+
+$ kubectl delete dataset hbase
+```
+应当发现，Nginx Pod和旧版本Dataset均正常删除，且绑定的AlluxioRuntime也被级联删除。
+
+**删除新版本Dataset**
+```
+$ kubectl delete pod another-nginx
+
+$ kubectl delete dataset another-hbase
+```
+
+应当发现，Nginx Pod和新版本Dataset均正常删除，且绑定的AlluxioRuntime也被级联删除。
+
+## 8-设置AlluxioRuntime各组件Pod的资源需求
+
+### 创建带资源需求的AlluxioRuntime
+
+```
+$ cat << EOF > dataset.yaml
+apiVersion: data.fluid.io/v1alpha1
+kind: Dataset
+metadata:
+  name: hbase
+spec:
+  mounts:
+    - mountPoint: https://mirrors.bit.edu.cn/apache/hbase/stable/
+      name: hbase
+---
+apiVersion: data.fluid.io/v1alpha1
+kind: AlluxioRuntime
+metadata:
+  name: hbase
+spec:
+  replicas: 1
+  tieredstore:
+    levels:
+      - mediumtype: MEM
+        path: /dev/shm
+        quota: 2Gi
+        high: "0.95"
+        low: "0.7"
+  master:
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 4Gi
+      limits:
+        cpu: 2000m
+        memory: 8Gi
+  jobMaster:
+    resources:
+      requests:
+        cpu: 1500m
+        memory: 4Gi
+      limits:
+        cpu: 2000m
+        memory: 8Gi
+  worker:
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 4Gi
+      limits:
+        cpu: 2000m
+        memory: 8Gi
+  jobWorker:
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 4Gi
+      limits:
+        cpu: 2000m
+        memory: 8Gi
+  fuse:
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 4Gi
+      limits:
+        cpu: 2000m
+        memory: 8Gi
+EOF
+```
+
+```
+$ kubectl create -f dataset.yaml
+dataset.data.fluid.io/hbase created
+alluxioruntime.data.fluid.io/hbase created
+```
+
+### 使用Dataset访问数据
+
+创建使用该Dataset的Pod，使Alluxio Fuse Pod被启动
+```
+$ cat << EOF > pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+spec:
+  containers:
+    - name: nginx
+      image: nginx
+      volumeMounts:
+        - mountPath: /data
+          name: hbase-vol
+  volumes:
+    - name: hbase-vol
+      persistentVolumeClaim:
+        claimName: hbase
+```
+
+```
+$ kubectl create -f pod.yaml
+```
+
+### 检查Alluxio各组件资源需求
+
+**Alluxio Master Pod**
+
+```
+$ kubectl get pod hbase-master-0 -o=jsonpath='{@.spec.containers[*].resources}' | jq
+{
+  "limits": {
+    "cpu": "2",
+    "memory": "8Gi"
+  },
+  "requests": {
+    "cpu": "1",
+    "memory": "4Gi"
+  }
+}
+{
+  "limits": {
+    "cpu": "2",
+    "memory": "8Gi"
+  },
+  "requests": {
+    "cpu": "1500m",
+    "memory": "4Gi"
+  }
+}
+```
+
+**Alluxio Worker Pod**
+```
+$ kubectl get pod hbase-worker-0 -o=jsonpath='{@.spec.containers[*].resources}' | jq
+{
+  "limits": {
+    "cpu": "2",
+    "memory": "10Gi"
+  },
+  "requests": {
+    "cpu": "1",
+    "memory": "4Gi"
+  }
+}
+{
+  "limits": {
+    "cpu": "2",
+    "memory": "8Gi"
+  },
+  "requests": {
+    "cpu": "1",
+    "memory": "4Gi"
+  }
+}
+```
+
+**Alluxio Fuse Pod**
+
+```
+$ kubectl get pod hbase-fuse-4stx5 -o=jsonpath='{@.spec.containers[*].resources}' | jq
+{
+  "limits": {
+    "cpu": "2",
+    "memory": "10Gi"
+  },
+  "requests": {
+    "cpu": "1",
+    "memory": "4Gi"
+  }
+}
+```
+
+应当发现Alluxio各组件Pod的资源需求均正确设置。
+
+
+## 9-Fuse客户端全局部署模式下扩容AlluxioRuntime
+
+
+### 查看节点信息
+
+查看集群中有哪些节点：
+
+```shell
+kubectl get nodes
+```
+
+本测试用例需要至少5个节点才能完成测试。下面将分别称呼它们为node1~node5。
+
+为node1~node4打上标签：
+
+```shell
+kubectl label node <nodeName> fuse=true
+```
+
+### 创建Dataset
+
+检查待创建的Dataset对象：
+
+```shell
+$ cat<<EOF >dataset.yaml
+apiVersion: data.fluid.io/v1alpha1
+kind: Dataset
+metadata:
+  name: hbase
+spec:
+  mounts:
+    - mountPoint: https://mirrors.tuna.tsinghua.edu.cn/apache/hbase/stable/
+      name: hbase
+EOF
+```
+
+创建Dataset：
+
+```shell
+kubectl create -f dataset.yaml
+```
+
+### 创建AlluxioRuntime
+
+检查待创建的AlluxioRuntime对象：
+
+```
+cat<<EOF >runtime-node-selector.yaml
+apiVersion: data.fluid.io/v1alpha1
+kind: AlluxioRuntime
+metadata:
+  name: hbase
+spec:
+  replicas: 1
+  tieredstore:
+    levels:
+      - mediumtype: MEM
+        path: /dev/shm
+        quota: 2Gi
+        high: "0.95"
+        low: "0.7"
+  properties:
+    alluxio.user.block.size.bytes.default: 256MB
+    alluxio.user.streaming.reader.chunk.size.bytes: 256MB
+    alluxio.user.local.reader.chunk.size.bytes: 256MB
+    alluxio.worker.network.reader.buffer.size: 256MB
+    alluxio.user.streaming.data.timeout: 300sec
+  fuse:
+    global: true
+    nodeSelector:
+      fuse: true
+    args:
+      - fuse
+      - --fuse-opts=kernel_cache,ro,max_read=131072,attr_timeout=7200,entry_timeout=7200,nonempty,max_readahead=0
+EOF
+```
+该配置文件中，fuse设置为了全局模式，fuse客户端会运行在刚刚打了标签的node1~node4上。
+
+创建AlluxioRuntime：
+
+```shell
+kubectl create -f runtime.yaml
+```
+
+### 查看alluxio-worker所在节点
+
+查看该Dataset对应的alluxio-worker所在节点：
+
+```shell
+kubectl get pod -o custom-columns=NAME:metadata.name,NAME:.spec.nodeName | grep hbase-worker
+```
+
+目前应该只有1副本，假设它所在的节点是node1。
+
+### 创建Nginx容器
+
+检查待创建的Pod对象：
+
+```shell
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+spec:
+  containers:
+    - name: nginx
+      image: nginx
+      volumeMounts:
+        - mountPath: /data
+          name: hbasevol
+  nodeSelector:
+    kubernetes.io/hostname: <nodeName>
+  volumes:
+    - name: hbasevol
+      persistentVolumeClaim:
+        claimName: hbase
+```
+
+这样的Pod需要创建3个，前两个的hostname指定为node2，第三个的hostname指定为node3。
+
+这样，node2~4上将分别有2、1、0个正在使用该数据集的Pod。
+
+### 扩容AlluxioRuntime
+
+修改AlluxioRuntime的.spec.replicas，依次修改为2~5。
+
+每次修改后，都再次查看该Dataset对应的alluxio-worker所在节点：
+
+```shell
+kubectl get pod -o custom-columns=NAME:metadata.name,NAME:.spec.nodeName | grep hbase-worker
+```
+
+可以看到，新建的alluxio-worker将依次被调度到node2~5。
+
+## 10-使用JindoRuntime访问OSS对象存储数据
+
+### 准备工作
+
+**安装Fluid时启用JindoRuntime**
+
+```
+$ kubectl create ns fluid-system
+
+$ helm install --set runtime.jindo.enabled=true fluid /fluid/charts/fluid/fluid
+```
+
+```
+$ kubectl get pod -n fluid-system
+...
+jindoruntime-controller-6559bb466-2x8tm      1/1     Running   0          2m13s
+```
+应当发现，存在jindoruntime controller pod处于Running状态
+
+**准备OSS对象存储**
+
+1. 记录接下来需要访问的OSS Bucket的访问端点信息`OSS_BUCKET_ENDPOINT`
+2. 获取`ACCESS_KEY_ID`和`ACCESS_KEY_SECRET`信息
+
+**创建Secret存储上述访问凭证**
+
+```
+$ cat << EOF > secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysecret
+stringData:
+  fs.oss.accessKeyId: <ACCESS_KEY_ID>
+  fs.oss.accessKeySecret: <ACCESS_KEY_SECRET>
+EOF
+```
+
+```
+$ kubectl create -f secret.yaml
+```
+
+### 创建Dataset和JindoRuntime
+
+```
+$ cat << EOF > dataset.yaml
+apiVersion: data.fluid.io/v1alpha1
+kind: Dataset
+metadata:
+  name: oss-bucket
+spec:
+  mounts:
+    - mountPoint: oss://<OSS_BUCKET_NAME>
+      options:
+        fs.oss.endpoint: <OSS_BUCKET_ENDPOINT>
+      name: ossbucket
+      encryptOptions:
+        - name: fs.oss.accessKeyId
+          valueFrom:
+            secretKeyRef:
+              name: mysecret
+              key: fs.oss.accessKeyId
+        - name: fs.oss.accessKeySecret
+          valueFrom:
+            secretKeyRef:
+              name: mysecret
+              key: fs.oss.accessKeySecret
+---
+apiVersion: data.fluid.io/v1alpha1
+kind: JindoRuntime
+metadata:
+  name: oss-bucket
+spec:
+  replicas: 1
+  tieredstore:
+    levels:
+      - mediumtype: MEM
+        path: /dev/shm
+        quota: 10G
+        high: "0.99"
+        low: "0.98"
+EOF
+```
+
+```
+$ kubectl create -f dataset.yaml
+dataset.data.fluid.io/oss-bucket created
+jindoruntime.data.fluid.io/oss-bucket created
+```
+
+### 通过Dataset访问数据
+
+等待[Dataset状态变为Bound](#检查dataset和alluxioruntime状态)后，创建Pod访问OSS Bucket中数据
+
+```
+$ cat << EOF > nginx.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+spec:
+  containers:
+    - name: nginx
+      image: nginx
+      volumeMounts:
+        - mountPath: /data
+          name: oss-vol
+  volumes:
+    - name: oss-vol
+      persistentVolumeClaim:
+        claimName: oss-bucket
+EOF
+```
+
+```
+$ kubectl create -f nginx.yaml
+pod/nginx created
+```
+
+登录到Nginx Pod中，应当发现可以访问OSS中数据:
+
+```
+$ kubectl exec -it nginx bash
+
+root@nginx:/# ls -lR /data/jindo
+
+root@nginx:/# cp -lR /data/jindo ./
+```
+
+### 环境清理
+
+**删除Nginx Pod**
+```
+$ kubectl delete -f nginx.yaml
+```
+
+**删除Dataset和JindoRuntime**
+```
+$ kubectl delete -f dataset.yaml
 ```
