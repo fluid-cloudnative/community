@@ -55,18 +55,25 @@
     - [创建带资源需求的AlluxioRuntime](#创建带资源需求的alluxioruntime)
     - [使用Dataset访问数据](#使用dataset访问数据)
     - [检查Alluxio各组件资源需求](#检查alluxio各组件资源需求)
-  - [9-Fuse客户端全局部署模式下扩容AlluxioRuntime](#9-fuse客户端全局部署模式下扩容alluxioruntime)
-    - [查看节点信息](#查看节点信息)
+  - [9-Alluxio动态变更挂载点](#9-alluxio动态变更挂载点)
     - [创建Dataset](#创建dataset)
+    - [检查Dataset状态和挂载点信息](#检查dataset状态和挂载点信息)
+    - [修改Dataset挂载点](#修改dataset挂载点)
+    - [再次检查Dataset状态和挂载点信息](#再次检查dataset状态和挂载点信息)
+    - [Alluxio Master崩溃后挂载点恢复功能测试](#alluxio-master崩溃后挂载点恢复功能测试)
+    - [环境清理](#环境清理-3)
+  - [10-Fuse客户端全局部署模式下扩容AlluxioRuntime](#10-fuse客户端全局部署模式下扩容alluxioruntime)
+    - [查看节点信息](#查看节点信息)
+    - [创建Dataset](#创建dataset-1)
     - [创建AlluxioRuntime](#创建alluxioruntime)
     - [查看alluxio-worker所在节点](#查看alluxio-worker所在节点)
     - [创建Nginx容器](#创建nginx容器)
     - [扩容AlluxioRuntime](#扩容alluxioruntime)
-  - [10-使用JindoRuntime访问OSS对象存储数据](#10-使用jindoruntime访问oss对象存储数据)
+  - [11-使用JindoRuntime访问OSS对象存储数据](#11-使用jindoruntime访问oss对象存储数据)
     - [准备工作](#准备工作-3)
     - [创建Dataset和JindoRuntime](#创建dataset和jindoruntime)
     - [通过Dataset访问数据](#通过dataset访问数据-1)
-    - [环境清理](#环境清理-3)
+    - [环境清理](#环境清理-4)
 
 ## 1-安装fluid
 
@@ -1442,7 +1449,207 @@ $ kubectl get pod hbase-fuse-4stx5 -o=jsonpath='{@.spec.containers[*].resources}
 应当发现Alluxio各组件Pod的资源需求均正确设置。
 
 
-## 9-Fuse客户端全局部署模式下扩容AlluxioRuntime
+## 9-Alluxio动态变更挂载点
+
+### 创建Dataset
+
+**创建有两个挂载点的Dataset**
+
+```
+$ cat << EOF > dataset.yaml
+apiVersion: data.fluid.io/v1alpha1
+kind: Dataset
+metadata:
+  name: hbase
+spec:
+  mounts:
+    - mountPoint: https://mirrors.bit.edu.cn/apache/hbase/stable/
+      name: hbase
+    - mountPoint: https://mirrors.bit.edu.cn/apache/hadoop/common/stable/
+      name: hadoop 
+---
+apiVersion: data.fluid.io/v1alpha1
+kind: AlluxioRuntime
+metadata:
+  name: hbase
+spec:
+  replicas: 2
+  tieredstore:
+    levels:
+      - mediumtype: MEM
+        path: /dev/shm
+        quota: 2Gi
+        high: "0.95"
+        low: "0.7"
+```
+
+```
+$ kubectl create -f dataset.yaml
+```
+
+### 检查Dataset状态和挂载点信息
+
+**检查Dataset状态直至Bound**
+
+```
+$ kubectl get dataset
+NAME    UFS TOTAL SIZE   CACHED   CACHE CAPACITY   CACHED PERCENTAGE   PHASE   AGE
+hbase   1.76GiB          0.00B    4.00GiB          0.0%                Bound   3m20s
+```
+
+**检查Alluxio挂载点信息**
+
+```
+$ kubectl exec -it hbase-master-0 -- alluxio fs mount
+https://mirrors.bit.edu.cn/apache/hbase/stable          on  /hbase   (web, capacity=-1B, used=-1B, read-only, not shared, properties={})
+https://mirrors.bit.edu.cn/apache/hadoop/common/stable  on  /hadoop  (web, capacity=-1B, used=-1B, read-only, not shared, properties={})
+/underFSStorage                                         on  /        (local, capacity=0B, used=0B, not read-only, not shared, properties={})
+```
+
+应当发现，除了根目录挂载点外(`/`)，还有Dataset中指定的两个WebUFS挂载点，路径分别为`/hbase`和`/hadoop`
+
+**检查挂载点数据**
+
+```
+$ kubectl exec -it hbase-master-0 -- alluxio fs ls -R /hbase
+        1058578       PERSISTED 12-18-2021 03:35:45:000   0% /hbase/RELEASENOTES.md
+       37038972       PERSISTED 12-18-2021 03:35:45:000   0% /hbase/hbase-2.4.9-src.tar.gz
+         101357       PERSISTED 12-18-2021 03:35:45:000   0% /hbase/CHANGES.md
+      283496242       PERSISTED 12-18-2021 03:35:45:000   0% /hbase/hbase-2.4.9-bin.tar.gz
+      272026535       PERSISTED 12-18-2021 03:35:45:000   0% /hbase/hbase-2.4.9-client-bin.tar.gz
+              0       PERSISTED 12-18-2021 03:35:45:000 100% /hbase/api_compare_2.4.8_to_2.4.9RC0.html
+```
+
+```
+$ kubectl exec -it hbase-master-0 -- alluxio fs ls -R /hadoop
+          12517       PERSISTED 06-15-2021 09:55:27:000   0% /hadoop/RELEASENOTES.md
+        2104522       PERSISTED 06-15-2021 09:55:27:000   0% /hadoop/hadoop-3.3.1-rat.txt
+      605187279       PERSISTED 06-15-2021 09:55:27:000   0% /hadoop/hadoop-3.3.1.tar.gz
+       43898779       PERSISTED 06-15-2021 09:55:27:000   0% /hadoop/hadoop-3.3.1-site.tar.gz
+         125612       PERSISTED 06-15-2021 09:55:27:000   0% /hadoop/CHANGELOG.md
+      607792249       PERSISTED 06-15-2021 15:20:33:000   0% /hadoop/hadoop-3.3.1-aarch64.tar.gz
+       34849073       PERSISTED 06-15-2021 09:55:27:000   0% /hadoop/hadoop-3.3.1-src.tar.gz
+```
+
+可以分别发现对应Apache镜像站网址包含的文件信息
+
+### 修改Dataset挂载点
+
+将Dataset配置文件修改为如下:
+```
+$ cat << EOF > dataset.yaml
+apiVersion: data.fluid.io/v1alpha1
+kind: Dataset
+metadata:
+  name: hbase
+spec:
+  mounts:
+    - mountPoint: https://mirrors.bit.edu.cn/apache/hbase/stable/
+      name: hbase
+    #- mountPoint: https://mirrors.bit.edu.cn/apache/hadoop/common/stable/
+    #  name: hadoop
+    - mountPoint: https://mirrors.bit.edu.cn/apache/zookeeper/stable/
+      name: zookeeper
+---
+apiVersion: data.fluid.io/v1alpha1
+kind: AlluxioRuntime
+metadata:
+  name: hbase
+spec:
+  replicas: 2
+  tieredstore:
+    levels:
+      - mediumtype: MEM
+        path: /dev/shm
+        quota: 2Gi
+        high: "0.95"
+        low: "0.7"
+```
+
+即删除名为`hadoop`的挂载点，添加名为`zookeeper`的挂载点。
+
+**更新Dataset**
+
+```
+$ kubectl apply -f dataset.yaml
+dataset.data.fluid.io/hbase configured
+alluxioruntime.data.fluid.io/hbase configured
+```
+
+### 再次检查Dataset状态和挂载点信息
+
+**检查Dataset状态**
+
+```
+$ kubectl get dataset hbase
+NAME    UFS TOTAL SIZE   CACHED   CACHE CAPACITY   CACHED PERCENTAGE   PHASE   AGE
+hbase   [Calculating]    0.00B    4.00GiB                              Bound   12m
+```
+
+应当发现，由于挂载点变更，`Dataset.UfsTotalSize`正在重新计算。一段时间后，计算完成：
+
+```
+$ kubectl get dataset hbase
+NAME    UFS TOTAL SIZE   CACHED   CACHE CAPACITY   CACHED PERCENTAGE   PHASE   AGE
+hbase   581.40MiB        0.00B    4.00GiB          0.0%                Bound   14m
+```
+
+**检查Alluxio挂载点变化情况**
+
+```
+$ kubectl exec -it hbase-master-0 -- alluxio fs mount
+https://mirrors.bit.edu.cn/apache/hbase/stable      on  /hbase      (web, capacity=-1B, used=-1B, read-only, not shared, properties={})
+https://mirrors.bit.edu.cn/apache/zookeeper/stable  on  /zookeeper  (web, capacity=-1B, used=-1B, read-only, not shared, properties={})
+/underFSStorage                                     on  /           (local, capacity=0B, used=0B, not read-only, not shared, properties={})
+```
+应当发现, `/hadoop`的挂载点已被卸载，新的`/zookeeper`路径被挂载
+
+### Alluxio Master崩溃后挂载点恢复功能测试
+
+**登录到Alluxio Master Pod所在节点**
+
+```shell
+$ MASTER_NODE_IP=$(kubectl get pod --no-headers=true hbase-master-0 -o wide | awk '{print $6}')
+
+$ ssh root@$MASTER_NODE_IP
+```
+
+**找到Alluxio Master容器PID并杀死进程模拟崩溃场景**
+
+```shell
+$ MASTER_PID=$(docker inspect k8s_POD_hbase-master-0_default_f4f57ad2-56b5-4b54-a12d-d1a4ce9ceaeb_0 --format='{{.State.Pid}}')
+
+$ kill $MASTER_PID
+```
+
+**检查Alluxio Master Pod重启后状态**
+
+```
+$ kubectl get pod hbase-master-0
+NAME             READY   STATUS    RESTARTS   AGE
+hbase-master-0   2/2     Running   2          28m
+```
+
+应当发现`hbase-master-0`崩溃后正常重启
+
+**检查挂载点信息**
+
+```
+$ kubectl exec -it hbase-master-0 -- alluxio fs mount
+https://mirrors.bit.edu.cn/apache/hbase/stable      on  /hbase      (web, capacity=-1B, used=-1B, read-only, not shared, properties={})
+https://mirrors.bit.edu.cn/apache/zookeeper/stable  on  /zookeeper  (web, capacity=-1B, used=-1B, read-only, not shared, properties={})
+/underFSStorage                                     on  /           (local, capacity=0B, used=0B, not read-only, not shared, properties={})
+```
+
+应当发现，挂载点与Dataset中描述一致
+
+### 环境清理
+
+```
+$ kubectl delete -f dataset.yaml
+```
+
+## 10-Fuse客户端全局部署模式下扩容AlluxioRuntime
 
 
 ### 查看节点信息
@@ -1576,7 +1783,7 @@ kubectl get pod -o custom-columns=NAME:metadata.name,NAME:.spec.nodeName | grep 
 
 可以看到，新建的alluxio-worker将依次被调度到node2~5。
 
-## 10-使用JindoRuntime访问OSS对象存储数据
+## 11-使用JindoRuntime访问OSS对象存储数据
 
 ### 准备工作
 
