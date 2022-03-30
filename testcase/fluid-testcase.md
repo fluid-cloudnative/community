@@ -74,6 +74,13 @@
     - [创建Dataset和JindoRuntime](#创建dataset和jindoruntime)
     - [通过Dataset访问数据](#通过dataset访问数据-1)
     - [环境清理](#环境清理-4)
+  - [12-CSI Plugin Stale Node Patch验证](#12-csi-plugin-stale-node-patch验证)
+    - [准备工作](#准备工作-4)
+    - [创建Dataset和AlluxioRuntime](#创建dataset和alluxioruntime-2)
+    - [通过Dataset访问数据](#通过dataset访问数据-2)
+    - [添加节点标签](#添加节点标签)
+    - [删除并重新创建Nginx Pod](#删除并重新创建nginx-pod)
+    - [环境清理并进行自定义标签检查](#环境清理并进行自定义标签检查)
 
 ## 1-安装fluid
 
@@ -1922,4 +1929,182 @@ $ kubectl delete -f nginx.yaml
 **删除Dataset和JindoRuntime**
 ```
 $ kubectl delete -f dataset.yaml
+```
+
+## 12-CSI Plugin Stale Node Patch验证
+
+### 准备工作
+
+相关PR:
+- https://github.com/fluid-cloudnative/fluid/pull/1621/files
+- https://github.com/fluid-cloudnative/fluid/pull/1617
+
+确保Kubernetes集群中安装Fluid版本 >= `0.8.0-43f0db2`
+
+```
+$ kubectl exec -it -n fluid-system csi-nodeplugin-fluid-fv6rh -c plugins -- fluid-csi version
+  BuildDate: 2022-03-26_12:28:05
+  GitCommit: 43f0db2dce5eb98db0f4ef2c9a2afb885c743d2c
+  GitTreeState: clean
+  GoVersion: go1.16.8
+  Compiler: gc
+  Platform: linux/amd64
+```
+
+Fluid CSI Plugin的`StaleNodePatch`功能默认开启，检查CSI Plugin Pod环境变量是否为空，或环境变量值为`true`
+
+```
+$ kubectl get pod -o yaml -n fluid-system csi-nodeplugin-fluid-fv6rh | grep ALLOW_PATCH_STALE_NODE -A3
+              k:{"name":"ALLOW_PATCH_STALE_NODE"}:
+                .: {}
+                f:name: {}
+                f:value: {}
+--
+    - name: ALLOW_PATCH_STALE_NODE
+      value: "true"
+    - name: KUBELET_ROOTDIR
+      value: /var/lib/kubelet
+```
+
+### 创建Dataset和AlluxioRuntime
+
+```yaml
+$ cat << EOF > dataset.yaml
+apiVersion: data.fluid.io/v1alpha1
+kind: Dataset
+metadata:
+  name: hbase
+spec:
+  mounts:
+    - mountPoint: https://mirrors.bit.edu.cn/apache/hbase/2.4.11/
+      name: hbase
+---
+apiVersion: data.fluid.io/v1alpha1
+kind: AlluxioRuntime
+metadata:
+  name: hbase
+spec:
+  replicas: 1
+  tieredstore:
+    levels:
+      - mediumtype: MEM
+        path: /dev/shm
+        quota: 2Gi
+        high: "0.95"
+        low: "0.7"
+EOF
+```
+
+```
+$ kubectl create -f dataset.yaml
+```
+
+应当发现Alluxio Pod正常启动:
+```
+$ kubectl get pod
+NAME             READY   STATUS    RESTARTS   AGE
+hbase-master-0   2/2     Running   0          61s
+hbase-worker-0   2/2     Running   0          33s
+```
+
+Dataset和AlluxioRuntime状态正常
+```
+$ kubectl get dataset hbase
+NAME    UFS TOTAL SIZE   CACHED   CACHE CAPACITY   CACHED PERCENTAGE   PHASE   AGE
+hbase   566.11MiB        0.00B    2.00GiB          0.0%                Bound   111s
+
+$ kubectl get alluxioruntime -o wide hbase
+NAME    READY MASTERS   DESIRED MASTERS   MASTER PHASE   READY WORKERS   DESIRED WORKERS   WORKER PHASE   READY FUSES   DESIRED FUSES   FUSE PHASE   API GATEWAY   AGE
+hbase   1               1                 Ready          1               1                 Ready          0             0               Ready                      2m46s
+```
+
+### 通过Dataset访问数据
+
+```
+$ cat << EOF > nginx.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+spec:
+  containers:
+    - name: nginx
+      image: nginx
+      volumeMounts:
+        - mountPath: /data
+          name: hbase-vol
+  volumes:
+    - name: hbase-vol
+      persistentVolumeClaim:
+        claimName: hbase
+EOF
+```
+
+```
+$ kubectl create -f nginx.yaml
+```
+
+应当发现，Alluxio Fuse Pod正常启动，对应K8s节点上存在标签`fluid.io/f-default-hbase`：
+```
+$ kubectl get pod | grep fuse
+hbase-fuse-4csrr   1/1     Running   0          31s
+
+$ kubectl describe node cn-beijing.172.16.0.140 | grep f-default-hbase
+                    fluid.io/f-default-hbase=true
+```
+
+### 添加节点标签
+
+添加节点自定义标签，使得CSI Plugin中缓存的Node信息过时：
+
+```
+$ kubectl label node cn-beijing.172.16.0.140 foo=bar
+```
+
+### 删除并重新创建Nginx Pod
+
+```
+$ kubectl delete pod nginx
+```
+
+应当发现，删除Nginx Pod后，`fluid.io/f-default-hbase`标签和自定义标签`foo=bar`均仍然存在：
+
+```
+$ kubectl describe node cn-beijing.172.16.0.140 | grep "f-default-hbase\|foo"
+                    fluid.io/f-default-hbase=true
+                    foo=bar
+```
+
+重新创建Nginx Pod:
+```
+$ kubectl create -f nginx.yaml
+```
+
+Nginx Pod正常启动:
+
+```
+$ kubectl get pod | grep nginx
+nginx              1/1     Running   0          23s
+```
+
+应当发现，重新创建Nginx Pod后，`fluid.io/f-default-hbase`标签和自定义标签`foo=bar`均仍然存在：
+
+```
+$ kubectl describe node cn-beijing.172.16.0.140 | grep "f-default-hbase\|foo"
+                    fluid.io/f-default-hbase=true
+                    foo=bar
+```
+
+### 环境清理并进行自定义标签检查
+
+```
+$ kubectl delete pod nginx
+$ kubectl delete -f dataset.yaml
+```
+
+待Dataset和AlluxioRuntime完整删除后，应当发现，仅包含自定义标签`foo=bar`:
+
+```
+$ kubectl describe node cn-beijing.172.16.0.140 | grep "f-default-hbase\|foo"
+                    foo=bar
 ```
