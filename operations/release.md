@@ -5,6 +5,8 @@
 1. 更新what’s new  
 2. 创建tag，并发布
 3. 发布Release，并且编写Release Note, 上传package
+4. 更新Charts项目
+5. 更新fluid-cloudnative.github.io项目
 
 
 ## 操作细节
@@ -115,3 +117,33 @@ tar tvf fluid-artifact.tar
 ```
 
 将`fluid-artifact.tar`中的全部文件解压并上传至Helm Repo（e.g. OSS）
+
+
+### 5.  发布Helm Chart到https://github.com/fluid-cloudnative/charts/releases
+
+
+创建charts的branch, 更新
+
+```
+mkdir fluid-cloudnative
+cd fluid-cloudnative
+git clone https://github.com/fluid-cloudnative/fluid.git
+cd fluid
+git checkout v0.5.0
+
+cd ../
+git clone https://github.com/{your name}/charts.git
+cd charts
+# 注意是0.5.0，而不是v0.5.0
+git checkout -b helm-chart-fluid-0.5.0
+bash update-fluid-charts.sh
+
+echo $? #注意返回值是0
+0
+
+bash create_history_version.sh
+
+git add --all
+git commit -s -m "Update helm-chart-fluid-0.5.0"
+git push
+```
