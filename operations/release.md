@@ -7,6 +7,7 @@
 3. 发布Release，并且编写Release Note, 上传package
 4. 更新Charts项目
 5. 更新fluid-cloudnative.github.io项目
+6. 更新
 
 
 ## 操作细节
@@ -67,6 +68,13 @@ helm package fluid
 Successfully packaged chart and saved it to: fluid-master/charts/fluid/fluid-0.5.0.tgz
 ```
 
+5. 创建branch, 比如branch为v0.5
+
+```
+git checkout -b v0.5
+git push v0.5
+```
+
 > 下载地址：https://github.com/helm/helm/releases/tag/v3.5.3
 
 
@@ -102,24 +110,8 @@ Branch: https://github.com/Alluxio/alluxio/commits/branch-2.3-fuse
 
 2. 上传package包
 
-### 4. 上传Helm Package至Artifact Hub
 
-运行脚本，生成需要上传的Helm chart package，并更新包索引文件`index.yaml`:
-```
-cd $GOPATH/src/github.com/fluid-cloudnative/fluid
-tools/fluid-artifact.sh README.md charts/fluid/fluid
-```
-
-生成出的`fluid-artifact.tar`位于`./charts/fluid/`目录下：
-```
-cd charts/fluid
-tar tvf fluid-artifact.tar
-```
-
-将`fluid-artifact.tar`中的全部文件解压并上传至Helm Repo（e.g. OSS）
-
-
-### 5.  发布Helm Chart到https://github.com/fluid-cloudnative/charts/releases
+### 4.  发布Helm Chart到https://github.com/fluid-cloudnative/charts/releases
 
 
 创建charts的branch, 更新
@@ -147,3 +139,7 @@ git add --all
 git commit -s -m "Update helm-chart-fluid-0.5.0"
 git push
 ```
+
+### 6. 在master branch中更新新版本
+
+1. 将makefile中的
