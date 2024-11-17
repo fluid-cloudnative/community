@@ -6,7 +6,7 @@
 2. 创建tag，并发布
 3. 发布Release，并且编写Release Note, 上传package
 4. 更新Charts项目
-5. 在master branch中将已经发布的版本修改为新版本
+5. 在 master 分支中将已发布的版本更新为新版本
 
 
 ## 操作细节
@@ -14,18 +14,19 @@
 
 ### 1. 更新what’s new 
 
-1. 在github页面Fork 项目到自己的repo
+1. 在 GitHub 页面 Fork 项目到自己的仓库。
 
-2. 从自己的repo里checkout出新的branch
+2. 从自己的仓库中 checkout 出新的分支：
 
 ```
-git clone https://github.com/{your repo}/fluid.git
+git clone https://github.com/{your-repo}/fluid.git
 cd fluid
 git checkout -b update_readme_release
 ```
 
 3. 更新文档
-“What is NEW!”in $FLUID_HOME/ReadMe.md (both CN and EN), vedio link(optional);
+
+编辑 $FLUID_HOME/ReadMe.md 中的 "What is NEW!"（包括中文和英文），可选添加视频链接。
 
 4. 提交代码
 
@@ -37,9 +38,9 @@ git commit -s -m "update what's new for 0.5.0"
 5. 创建Pull Request, 并且请求review, 等待合并完成后进入下一个步骤
 
 
-### 2. 创建tag (此操作是在项目repo，因此请小心操作)
+### 2. 创建tag （请在项目仓库中小心操作）
 
-1. 从https://github.com/fluid-cloudnative/fluid.git
+1. 从 https://github.com/fluid-cloudnative/fluid.git 克隆项目
 
 ```
 git clone https://github.com/fluid-cloudnative/fluid.git fluid-master
@@ -52,7 +53,7 @@ cd fluid-master
 git log
 ```
 
-3. 创建新版本, 比如版本为0.5.0
+3. 创建新版本 tag, 比如版本为0.5.0 时
 
 ```
 git tag v0.5.0
@@ -64,10 +65,10 @@ git push origin v0.5.0
 ```
 cd fluid-master/charts/fluid
 helm package fluid
-Successfully packaged chart and saved it to: fluid-master/charts/fluid/fluid-0.5.0.tgz
+# 输出： Successfully packaged chart and saved it to: fluid-master/charts/fluid/fluid-0.5.0.tgz
 ```
 
-5. 创建branch, 比如branch为v0.5
+5. 创建分支, 比如对应分支为v0.5
 
 ```
 git checkout -b v0.5
