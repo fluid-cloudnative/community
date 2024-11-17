@@ -142,6 +142,6 @@ git push
 
 ### 5. 在master branch中将已经发布的版本修改为新版本，比如新版本为0.6.0
 
-1. 将MakeFile中的包含VERSION=的一行的值改为新版本0.6.0
+1. 修改 Makefile 中 VERSION= 的值为新版本 0.6.0。
 
-2. 将charts/fluid/fluid/Chart.yaml中version:的一行的值改为0.6.0
+2. 修改 charts/fluid/fluid/Chart.yaml 中 version: 的值为 0.6.0。
