@@ -140,6 +140,8 @@ git commit -s -m "Update helm-chart-fluid-0.5.0"
 git push
 ```
 
-### 6. 在master branch中更新新版本
+### 6. 在master branch中将已经发布的版本修改为新版本，比如新版本为0.6.0
 
-1. 将makefile中的
+1. 将MakeFile中的包含VERSION=的一行的值改为新版本0.6.0
+
+2. 将charts/fluid/fluid/Chart.yaml中version:的一行的值改为0.6.0
