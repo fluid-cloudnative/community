@@ -6,8 +6,7 @@
 2. 创建tag，并发布
 3. 发布Release，并且编写Release Note, 上传package
 4. 更新Charts项目
-5. 更新fluid-cloudnative.github.io项目
-6. 更新
+5. 在master branch中将已经发布的版本修改为新版本
 
 
 ## 操作细节
@@ -140,7 +139,7 @@ git commit -s -m "Update helm-chart-fluid-0.5.0"
 git push
 ```
 
-### 6. 在master branch中将已经发布的版本修改为新版本，比如新版本为0.6.0
+### 5. 在master branch中将已经发布的版本修改为新版本，比如新版本为0.6.0
 
 1. 将MakeFile中的包含VERSION=的一行的值改为新版本0.6.0
 
