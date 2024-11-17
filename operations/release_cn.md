@@ -1,147 +1,142 @@
+---
+
 # 发布流程
 
 ## 流程概述
 
-1. 更新what’s new  
-2. 创建tag，并发布
-3. 发布Release，并且编写Release Note, 上传package
-4. 更新Charts项目
+1. 更新 "What's New"
+2. 创建 tag 并发布
+3. 发布 Release，编写 Release Note，上传 package
+4. 更新 Charts 项目
 5. 在 master 分支中将已发布的版本更新为新版本
-
 
 ## 操作细节
 
-
-### 1. 更新what’s new 
+### 1. 更新 "What's New"
 
 1. 在 GitHub 页面 Fork 项目到自己的仓库。
 
 2. 从自己的仓库中 checkout 出新的分支：
 
-```
-git clone https://github.com/{your-repo}/fluid.git
-cd fluid
-git checkout -b update_readme_release
-```
+   ```bash
+   git clone https://github.com/{your-repo}/fluid.git
+   cd fluid
+   git checkout -b update_readme_release
+   ```
 
-3. 更新文档
+3. 更新文档：编辑 `$FLUID_HOME/ReadMe.md` 中的 "What is NEW!"（包括中文和英文），可选添加视频链接。
 
-编辑 $FLUID_HOME/ReadMe.md 中的 "What is NEW!"（包括中文和英文），可选添加视频链接。
+4. 提交更改：
 
-4. 提交代码
+   ```bash
+   git add --all
+   git commit -s -m "Update what's new for 0.5.0"
+   ```
 
-```
-git add --all
-git commit -s -m "update what's new for 0.5.0"
-```
+5. 创建 Pull Request，请求审核，等待合并完成后进入下一步。
 
-5. 创建Pull Request, 并且请求review, 等待合并完成后进入下一个步骤
+### 2. 创建 tag （请在项目仓库中小心操作）
 
+1. 克隆项目：
 
-### 2. 创建tag （请在项目仓库中小心操作）
+   ```bash
+   git clone https://github.com/fluid-cloudnative/fluid.git fluid-master
+   cd fluid-master
+   ```
 
-1. 从 https://github.com/fluid-cloudnative/fluid.git 克隆项目
+2. 确认当前代码为最新版本：
 
-```
-git clone https://github.com/fluid-cloudnative/fluid.git fluid-master
-cd fluid-master
-```
+   ```bash
+   git pull
+   ```
 
-2. 确认当前代码为最新版本
+3. 创建新版本 tag，例如 0.5.0：
 
-```
-git log
-```
+   ```bash
+   git tag v0.5.0
+   git push origin v0.5.0
+   ```
 
-3. 创建新版本 tag, 比如版本为0.5.0 时
+4. 生成 Fluid package：
 
-```
-git tag v0.5.0
-git push origin v0.5.0
-```
+   ```bash
+   cd charts/fluid
+   helm package fluid
+   # 输出：Successfully packaged chart and saved it to: fluid-master/charts/fluid/fluid-0.5.0.tgz
+   ```
 
-4. 生成fluid package
+5. 创建分支，例如 v0.5：
 
-```
-cd fluid-master/charts/fluid
-helm package fluid
-# 输出： Successfully packaged chart and saved it to: fluid-master/charts/fluid/fluid-0.5.0.tgz
-```
+   ```bash
+   git checkout -b v0.5
+   git push origin v0.5
+   ```
 
-5. 创建分支, 比如对应分支为v0.5
+### 3. 发布 Release，编写 Release Note，上传 package
 
-```
-git checkout -b v0.5
-git push v0.5
-```
+1. 登录 GitHub，访问 [Releases 页面](https://github.com/fluid-cloudnative/fluid/releases)，点击 `Draft a new release`。
 
-> 下载地址：https://github.com/helm/helm/releases/tag/v3.5.3
+2. 选择 v0.5.0，并填写以下内容：
 
+   ```markdown
+   ## v0.5.0
 
-### 3. 发布Release，并且编写Release Note, 上传package
+   ### Features
 
+   - Add Scale out/in support
+   - Add Metadata Backup and Restore
+   - Support Fuse global mode, and toleration
+   - Enhance Prometheus support to Alluxio Runtime
+   - Support New Runtime: Jindo
+   - Support HDFS configuration
 
-1. 登录https://github.com/fluid-cloudnative/fluid/releases 点击 `Draft a new release`
+   ### Bugs
 
-选择v0.5.0, 并且填写markdown
+   - [Fix compatibility issue of K8s 1.19+](https://github.com/fluid-cloudnative/fluid/issues/603)
 
-```
-## v0.5.0
+   Please check [docs](https://github.com/fluid-cloudnative/fluid/blob/master/docs/zh/TOC.md) to learn how to use Fluid.
 
-### Features
+   **Compatible Alluxio Version**:
+   - Commit: https://github.com/Alluxio/alluxio/commit/42a0cf7df85be3225d226a36b37908d04e8cb595
+   - Branch: https://github.com/Alluxio/alluxio/commits/branch-2.3-fuse
+   ```
 
-- Add Scale out/in support
-- Add Metadata Backup and Restore
-- Support Fuse global mode, and toleration
-- Enhance Prometheous support to Alluxio Runtime
-- Support New Runtime： Jindo
-- Support HDFS configuration
+3. 上传 package 文件。
 
-### Bugs
+### 4. 发布 Helm Chart
 
-- [Fix compatibality issue of K8s 1.19+](https://github.com/fluid-cloudnative/fluid/issues/603)
+1. 创建 charts 的分支并更新：
 
-Please check [docs](https://github.com/fluid-cloudnative/fluid/blob/master/docs/zh/TOC.md) to learn how to use Fluid.
+   ```bash
+   mkdir fluid-cloudnative
+   cd fluid-cloudnative
+   git clone https://github.com/fluid-cloudnative/fluid.git
+   cd fluid
+   git checkout v0.5.0
 
-**Compatible Alluxio Version**:
-Commit: https://github.com/Alluxio/alluxio/commit/42a0cf7df85be3225d226a36b37908d04e8cb595
-Branch: https://github.com/Alluxio/alluxio/commits/branch-2.3-fuse
-```
+   cd ../
+   git clone https://github.com/{your-name}/charts.git
+   cd charts
+   git checkout -b helm-chart-fluid-0.5.0
+   bash update-fluid-charts.sh
 
-2. 上传package包
+   echo $? # 确保返回值为 0
+   ```
 
+2. 创建历史版本：
 
-### 4.  发布Helm Chart到https://github.com/fluid-cloudnative/charts/releases
+   ```bash
+   bash create_history_version.sh
 
+   git add --all
+   git commit -s -m "Update helm-chart-fluid-0.5.0"
+   git push
+   ```
 
-创建charts的branch, 更新
+### 5. 更新 master 分支版本
 
-```
-mkdir fluid-cloudnative
-cd fluid-cloudnative
-git clone https://github.com/fluid-cloudnative/fluid.git
-cd fluid
-git checkout v0.5.0
+1. 修改 Makefile 中 `VERSION=` 的值为新版本 0.6.0。
 
-cd ../
-git clone https://github.com/{your name}/charts.git
-cd charts
-# 注意是0.5.0，而不是v0.5.0
-git checkout -b helm-chart-fluid-0.5.0
-bash update-fluid-charts.sh
+2. 修改 `charts/fluid/fluid/Chart.yaml` 中 `version:` 的值为 0.6.0。
 
-echo $? #注意返回值是0
-0
-
-bash create_history_version.sh
-
-git add --all
-git commit -s -m "Update helm-chart-fluid-0.5.0"
-git push
-```
-
-### 5. 在master branch中将已经发布的版本修改为新版本，比如新版本为0.6.0
-
-1. 修改 Makefile 中 VERSION= 的值为新版本 0.6.0。
-
-2. 修改 charts/fluid/fluid/Chart.yaml 中 version: 的值为 0.6.0。
+---
