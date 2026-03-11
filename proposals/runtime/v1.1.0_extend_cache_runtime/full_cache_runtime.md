@@ -14,11 +14,8 @@ Fluid 提供一种通用的数据引擎缓存系统的接入机制（CacheRuntim
 
 ## 目标
 
-- Curvine Integration：Implement working reference adapters for Curvine；
-- DataOperation Support ：Implement DataOperation interface including DataLoad and DataOperation for cache runtime；
-- In-Place upgrade and rebuild：Implement  in-place upgrade for engine version update  and in-place cache rebuild after node failure or config change.
-
-
+- 通用的缓存运行时接口能够快速将新引擎集成到 Fluid 中，使平台更具可扩展性和对操作员更友好。
+- 完整的数据生命周期并支持就地升级和重建，Fluid 可以提供无缝、弹性和高效的数据管理，提高系统可用性，减少运营摩擦，并符合云原生数据编排的工业级要求。
 
 ## 方案
 
@@ -64,17 +61,14 @@ Cache Runtime 为缓存系统提供 RuntimeConfig，因此Curvine 组件需要**
 
 此外，Master Sts 启动后，需要执行 cv mount 进行挂载远程存储。
 
-- 不同于curvine，Juicefs 是在[启动时就执行 format ](https://juicefs.com/docs/zh/community/getting-started/for_distributed/#4-创建文件系统)，只支持一个远程存储，因此直接在 fuse 的启动命令里执行；
+- 不同于curvine，Juicefs 是无Master架构，在[启动时就执行 format ](https://juicefs.com/docs/zh/community/getting-started/for_distributed/#4-创建文件系统)，只支持一个远程存储，因此直接在 worker/fuse 的启动命令里执行；
 
 Curvine Cache Runtime 的处理流程如下图所示：本项工作的重点在于：
 
 1. 提供启动脚本，将 Fluid 提供的 RuntimeConfig 转化为 Curvine 所使用的配置文件；
-
-1. 拟采用 go template 要求的格式定义 Curvine 的配置文件，并进行替换；
-
+   - 拟采用 go template 要求的格式定义 Curvine 的配置文件，并进行替换；
 1. 添加 Mount UFS 步骤，在 Master Sts 启动完成后，进入 Master Pod 执行 cv mount 操作；
-
-1. mount 操作由缓存系统定义在ConfigMap中并挂载到 Master Pod 中。
+   - mount 操作由缓存系统定义在ConfigMap中并挂载到 Master Pod 中。
 
 ![img](./pics/curvine_integration.jpeg)
 
@@ -115,7 +109,7 @@ type DataOperator interface {
 
 为了保证与 TemplateEngine 的状态及处理逻辑一致，仍使用五种状态（None/Pending/Executing/Complete/Failed），其状态转换逻辑如下：
 
-![img](pics/state_transform.jpeg)
+<img src="pics/state_transform.jpeg" alt="img" style="zoom:80%;" />
 
 在核心实现上，与 TemplateEngine 的不同点在于 Helm 文件的生成，即需要实现接口
 
