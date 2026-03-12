@@ -63,12 +63,33 @@ Cache Runtime 为缓存系统提供 RuntimeConfig，因此Curvine 组件需要**
 
 - 不同于curvine，Juicefs 是无Master架构，在[启动时就执行 format ](https://juicefs.com/docs/zh/community/getting-started/for_distributed/#4-创建文件系统)，只支持一个远程存储，因此直接在 worker/fuse 的启动命令里执行；
 
+扩展 CacheRuntimeClass 定义，增加对 mount UFS 的支持
+
+```go
+type CacheRuntimeClass struct {
+    // 当前 Cache System 支持哪些数据操作
+    LifeCycleHook *LifeCycleHook `json:"lifeCycleHook,omitempty"`
+}
+type LifeCycleHook struct { 
+    // 挂载 UFS 的 hook 操作，针对 Master-Slave 架构，需要在 Master 中执行
+    MountUfs *MountUfs  `json:"mountUfs,omitempty"`
+}
+type MountUFS struct {
+    // 执行的命令，必选，会在 Master Pod 中执行
+    Command string `json:"command"`
+    
+    // 执行命令的超时时间（单位：秒），最小值为 5s.
+    Timeout int `json:"timeout,omitempty"`
+}
+```
+
 Curvine Cache Runtime 的处理流程如下图所示：本项工作的重点在于：
 
 1. 提供启动脚本，将 Fluid 提供的 RuntimeConfig 转化为 Curvine 所使用的配置文件；
    - 拟采用 go template 要求的格式定义 Curvine 的配置文件，并进行替换；
 1. 添加 Mount UFS 步骤，在 Master Sts 启动完成后，进入 Master Pod 执行 cv mount 操作；
-   - mount 操作由缓存系统定义在ConfigMap中并挂载到 Master Pod 中。
+   - **mount 操作在 CacheRuntimeClass 中定义，指定在特定的角色（如Master）的Pod 中执行指定的命令，以RuntimeConfig文件为参数。**
+   - 对于 JuiceFS 缓存系统，不需要单独执行 mount 参数，在 CacheRuntimeClass 中不定义即可；
 
 ![img](./pics/curvine_integration.jpeg)
 
@@ -83,19 +104,18 @@ type CacheRuntimeClass struct {
 }
 
 type DataOperationSpec struct {
-    // 数据操作，如 DataLoad, DataBackup, DataMigration等
+    // Data Operation，如 DataLoad, DataBackup, DataMigration等
     // +kubebuilder:validation:Enum=DataLoad
-    Name string `json:"string"`
+    Name string `json:"name,string"`
 
-    // DataOperation 所使用的镜像版本，避免从 Master Pod 的 Container 中解析
-    // +kubebuilder:validation:Required
-    Image string `json:"image,omitempty"`
-
-    // Command for DataOperation Pod
+    // The image name for DataOperation executing
+    Image string `json:"name,string"`
+    
+    // Command for image container
     Command []string `json:"command,omitempty"`
-
-    // Args for DataOperation Pod
-    Args []string `json:"args,omitempty"
+    
+    // Args for image container
+    Args []string `json:"args,omitempty" 
 }
 ```
 
@@ -122,8 +142,16 @@ type DataOperatorYamlGenerator interface {
 
 针对 operation 的 不同 Type，做不同的处理。DataProcess 不区分缓存系统，可以复用现有的 Helm Yaml 生成逻辑；而其它的 DataOperation 都需要相应的缓存系统镜像及其配置。
 
-- 通过新增的 DataOperationSpec 定义构建 Pod，并挂载 RuntimeConfig 和相应DataOperation的Config；
+- 通过新增的 DataOperationSpec 定义相应 Pod ，启动并执行相应的数据操作的命令，其中 Fluid DataOperation的相关配置信息，会挂载到 /etc/fluid/config/dataop 文件中；
 
-- Pod 的启动命令形式类似："/bin/sh -c  generate_conf.sh /etc/fluid/config/runtime && /entrypoint.sh /etc/fluid/config/dataop"，包括配置转换和缓存实际数据操作命令；
 
 ### 3. 支持 In-Place Upgrade 和 ReBuild
+
+版本更新时的原地升级：
+
+
+
+配置更新时的缓存重建：
+
+
+
