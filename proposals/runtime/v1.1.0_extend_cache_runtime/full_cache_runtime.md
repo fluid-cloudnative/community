@@ -83,15 +83,22 @@ type MountUFS struct {
 }
 ```
 
-Curvine Cache Runtime 的处理流程如下图所示：本项工作的重点在于：
+Curvine Cache Runtime 中在 SetUp 阶段相关的处理流程如下图所示：
+
+![img](./pics/curvine_integration.jpeg)
+
+SetUp 阶段所涉及的工作任务有：
 
 1. 提供启动脚本，将 Fluid 提供的 RuntimeConfig 转化为 Curvine 所使用的配置文件；
    - 拟采用 go template 要求的格式定义 Curvine 的配置文件，并进行替换；
 1. 添加 Mount UFS 步骤，在 Master Sts 启动完成后，进入 Master Pod 执行 cv mount 操作；
    - **mount 操作在 CacheRuntimeClass 中定义，指定在特定的角色（如Master）的Pod 中执行指定的命令，以RuntimeConfig文件为参数。**
    - 对于 JuiceFS 缓存系统，不需要单独执行 mount 参数，在 CacheRuntimeClass 中不定义即可；
+1. 对于 Worker/Client 而言，当前在创建时提供的上下文中，仍缺乏 Master Service 的信息，以便与其通信。
 
-![img](./pics/curvine_integration.jpeg)
+此外，如果修改了 DataSet 的 mount path，则需要在 Sync 阶段，进行 Ufs Update，此处逻辑可以参考已有的 TemplateEngine 实现。
+
+- 要求 MountUfs 中定义的 Command，能够根据当前的挂载信息和目标挂载信息，进行 umount 和 mount 操作。
 
 ### 2. 定义标准API，支持 DataOperation
 
@@ -131,7 +138,7 @@ type DataOperator interface {
 
 <img src="pics/state_transform.jpeg" alt="img" style="zoom:80%;" />
 
-在核心实现上，与 TemplateEngine 的不同点在于 Helm 文件的生成，即需要实现接口
+在核心实现上，与 TemplateEngine 的不同点在于 Executing 阶段 Helm 所用的文件的生成，即需要实现接口
 
 ```go
 // DataOperatorYamlGenerator is the implementation of DataOperator interface for runtime engine.
@@ -145,13 +152,35 @@ type DataOperatorYamlGenerator interface {
 - 通过新增的 DataOperationSpec 定义相应 Pod ，启动并执行相应的数据操作的命令，其中 Fluid DataOperation的相关配置信息，会挂载到 /etc/fluid/config/dataop 文件中；
 
 
+
 ### 3. 支持 In-Place Upgrade 和 ReBuild
 
-版本更新时的原地升级：
+Fluid 准备采用类似 OpenKruise 中的 AdvancedStatefulSet 的能力替代现有 Cache Runtime 的 StatefulSet，AdvancedStatefulSet 自身具备原地升级的能力，因此本项工作的内容，是结合 Cache Runtime 的生命周期，梳理相关的改动点，并实现支持原地升级和缓存重建的能力。
 
+Fluid  对于 Cache Runtime 的 Reconcile flow 如下图最左侧所示：
 
+![img](pics/inplace_add_funcs.jpg)
 
-配置更新时的缓存重建：
+Cache Runtime 中对缓存系统的各个组件（Master/Worker/Client Component）抽象了 ComponentHelper 接口，其接口定义如下:
 
+- 对于 Component 的销毁，采用 OwnererReference 进行管理，因此不用定义接口。
 
+```go
+type ComponentHelper interface {
+    // reconcile to create component workload
+	Reconciler(ctx context.Context, component *common.CacheRuntimeComponentValue) error
+    // create RuntimeComponentStatus accoring to component workload status
+	ConstructComponentStatus(ctx context.Context, component *common.CacheRuntimeComponentValue) (datav1alpha1.RuntimeComponentStatus, error)
+    // get TopologyConfig accoring to component workload spec, will be recorded in the Runtime ConfigMap
+	GetComponentTopologyInfo(ctx context.Context, component *common.CacheRuntimeComponentValue) (common.TopologyConfig, error)
+    // check component exist or not, currently useless
+	CheckComponentExist(ctx context.Context, component *common.CacheRuntimeComponentValue) (bool, error)
+    // clean up orphaned resources, currently useless
+	CleanupOrphanedComponentResources(ctx context.Context, component *common.CacheRuntimeComponentValue) error
+}
+```
+
+因此，第一点工作是使用 AdvancedStatefulSet 实现上面的接口。
+
+其次，当前的 CacheRuntime 框架中，是通过修改 CacheRuntimeSpec 的定义来修改各个Component的资源对象的（如副本数，环境变量等），当 Spec 发生改变时，需要在 Sync 函数中，新增 syncCacheRuntimeSpec 函数，用于比较当前组件的AdvancedStatefulSet 跟 Spec 定义的差别，并通过 AdvancedStatefulSet 的相应字段的修改，实现原地更新和升级的能力（该能力由 AdvancedStatefulSet 的控制器提供）。同时，新增 checkRuntimeHealthy 函数，根据最新的组件的状态（如目标副本数、可用副本数等信息）更新 CacheRuntime 的 Status 字段。 
 
