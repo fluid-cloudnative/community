@@ -2,7 +2,7 @@
 
 ## 背景
 
-Fluid 提供一种通用的数据引擎缓存系统的接入机制（CacheRuntime），降低非云原生领域数据引擎开发人员将其数据引擎接入到云原生环境中的学习和开发成本。目前仅实现了CRD的定义和基本的Reconcile逻辑，并未与实际的缓存系统（如Cuvine/Alluxio）进行联调测试。
+Fluid 提供一种通用的数据引擎缓存系统的接入机制（CacheRuntime），降低非云原生领域数据引擎开发人员将其数据引擎接入到云原生环境中的学习和开发成本。目前仅实现了CRD的定义和基本的Reconcile逻辑，并未与实际的缓存系统（如Curvine/Alluxio）进行联调测试。
 
 此外，当前的 Cache Runtime 接口缺乏对端到端的数据操作和动态 runtime 更改的支持，这迫使用户不得不删除并重新创建数据集以进行日常维护（例如，引擎升级或故障恢复）。这导致了不必要的停机时间、运营开销和糟糕的用户体验。通过扩展接口以管理完整的数据生命周期，并支持就地升级和重建，Fluid能够提供无缝、有弹性和高效的数据管理，从而提高系统可用性，满足云原生数据编排的生产级要求。
 
@@ -21,6 +21,8 @@ Fluid 提供一种通用的数据引擎缓存系统的接入机制（CacheRuntim
 
 ### 1. Generic Cache Runtime 集成 Curvine
 
+### 1.1 Curvine 操作介绍
+
 Curvine 是 Master-Worker 架构，其示例配置如下：
 
 ```toml
@@ -28,7 +30,7 @@ Curvine 是 Master-Worker 架构，其示例配置如下：
 [master]
 meta_dir = "testing/meta"
 
-# masta ha raft configuration.
+# masta HA raft configuration.
 [journal]
 journal_addrs = [
     {id = 1, hostname = "master-sts-0.master-sts-svc", port = 8996}
@@ -43,7 +45,7 @@ data_dir = [
 ]
 
 [fuse]
-mnt_path=/runtime-mnt/fuse
+mnt_path = "/runtime-mnt/fuse"
 ```
 
 其 master / worker / fuse 的启动命令如下：
@@ -51,50 +53,61 @@ mnt_path=/runtime-mnt/fuse
 ```shell
 # Master /entrypoint.sh master start
 /app/curvine/lib/curvine-server --service master --conf curvine-cluster.toml
-# Worker /entrypoint.sh master stop
+# Worker /entrypoint.sh worker start
 /app/curvine/lib/curvine-server --service worker --conf curvine-cluster.toml
-# Fuse
+# Fuse mount, path is defined at curvine-cluster.toml, or can use --mnt-path parameter.
 /app/curvine/lib/curvine-fuse --conf curvine-cluster.toml
 ```
 
-Cache Runtime 为缓存系统提供 RuntimeConfig，因此Curvine 组件需要**封装原始镜像的启动命令，先进行参数解析生成配置文件，再使用原始的启动命令启动进程**。
+Curvine 挂载底层文件文件时，需要等缓存系统启动完成后，显式通过命令`cv mount`执行。
 
-此外，Master Sts 启动后，需要执行 cv mount 进行挂载远程存储。
+### 1.2 扩展 CaceRuntime 的流程定义
+
+Curvine Cache Runtime 中在 SetUp 阶段相关的处理流程如下图所示：
+
+- Cache Runtime 为缓存系统提供 RuntimeConfig，因此Curvine 组件需要**封装原始镜像的启动命令，先进行参数解析生成配置文件，再使用原始的启动命令启动进程**。
+
+![img](./pics/curvine_integration.jpeg)
+
+但是，目前 Master Sts 启动后，缺少执行 cv mount 进行挂载远程存储的操作和获取缓存基本信息等操作。
 
 - 不同于curvine，Juicefs 是无Master架构，在[启动时就执行 format ](https://juicefs.com/docs/zh/community/getting-started/for_distributed/#4-创建文件系统)，只支持一个远程存储，因此直接在 worker/fuse 的启动命令里执行；
 
-扩展 CacheRuntimeClass 定义，增加对 mount UFS 的支持
+因此，需要扩展 CacheRuntimeClass 定义，增加对 mount UFS 等操作的支持
 
 ```go
 type CacheRuntimeClass struct {
-    // 当前 Cache System 支持哪些数据操作
-    LifeCycleHook *LifeCycleHook `json:"lifeCycleHook,omitempty"`
+    // 当前 Cache System 需要定义的操作，以支持 out-of-tree 集成
+    ExecutionEntries *ExecutionEntries `json:"executionEntries,omitempty"`
 }
-type LifeCycleHook struct { 
-    // 挂载 UFS 的 hook 操作，针对 Master-Slave 架构，需要在 Master 中执行
-    MountUfs *MountUfs  `json:"mountUfs,omitempty"`
+type ExecutionEntries struct { 
+    // 挂载 UFS 的操作，针对 Master-Slave 架构，需要在 Master 中执行
+    MountUfs *ExecutionCommonEntry  `json:"mountUfs,omitempty"`
+    
+    // 获取缓存信息的操作，如缓存总容量、已使用容量等（Fluid 定义输出格式），针对所有架构的缓存系统
+    ReportSummary *ExecutionCommonEntry `json:"reportSummary,omitempty"`
+    
+    // ... 可扩展增加新的 Entry
 }
-type MountUFS struct {
+// 通用的操作项
+type ExecutionCommonEntry struct {
     // 执行的命令，必选，会在 Master Pod 中执行
     Command string `json:"command"`
     
-    // 执行命令的超时时间（单位：秒），最小值为 5s.
+    // 执行命令的超时时间（单位：秒），默认（最小值）为 5s.
     Timeout int `json:"timeout,omitempty"`
 }
 ```
 
-Curvine Cache Runtime 中在 SetUp 阶段相关的处理流程如下图所示：
-
-![img](./pics/curvine_integration.jpeg)
-
-SetUp 阶段所涉及的工作任务有：
+集成 Curvine 在 SetUp 阶段所涉及的工作任务有：
 
 1. 提供启动脚本，将 Fluid 提供的 RuntimeConfig 转化为 Curvine 所使用的配置文件；
    - 拟采用 go template 要求的格式定义 Curvine 的配置文件，并进行替换；
 1. 添加 Mount UFS 步骤，在 Master Sts 启动完成后，进入 Master Pod 执行 cv mount 操作；
    - **mount 操作在 CacheRuntimeClass 中定义，指定在特定的角色（如Master）的Pod 中执行指定的命令，以RuntimeConfig文件为参数。**
    - 对于 JuiceFS 缓存系统，不需要单独执行 mount 参数，在 CacheRuntimeClass 中不定义即可；
-1. 对于 Worker/Client 而言，当前在创建时提供的上下文中，仍缺乏 Master Service 的信息，以便与其通信。
+1. 对于 Worker/Client 而言，当前在创建时提供的上下文（RuntimeConfig）中，仍缺乏 Master Service 的信息，需补充以便与其通信。
+1. 添加 ReportSummary 操作，当缓存系统 Ready 时，获取缓存信息并更新 DataSet 的 Status 字段。
 
 此外，如果修改了 DataSet 的 mount path，则需要在 Sync 阶段，进行 Ufs Update，此处逻辑可以参考已有的 TemplateEngine 实现。
 
@@ -102,7 +115,11 @@ SetUp 阶段所涉及的工作任务有：
 
 ### 2. 定义标准API，支持 DataOperation
 
-针对 DataOperation，扩展 CacheRuntimeClass 定义，表明支持哪些数据操作：
+针对 DataOperation（DataLoad/DataBackup/DataMigrate/DataProcess），扩展 CacheRuntimeClass 定义，表明支持哪些数据操作：
+
+- DataProcess 的实现跟缓存系统无关，其 CRD 定义中包含镜像及命令，不需要扩展接口定义；
+- DataBackup 和 DataMigrate : Curvine 当前不支持这些操作，暂时不实现，接口定义支持后续扩展；
+- 因此本项工作定义标准接口，并针对 Curvine 实现 DataLoad；
 
 ```go
 type CacheRuntimeClass struct {
@@ -111,18 +128,18 @@ type CacheRuntimeClass struct {
 }
 
 type DataOperationSpec struct {
-    // Data Operation，如 DataLoad, DataBackup, DataMigration等
+    // Data Operation Name, currently only support DataLoad
     // +kubebuilder:validation:Enum=DataLoad
-    Name string `json:"name,string"`
+    Name string `json:"name,omitempty"`
 
     // The image name for DataOperation executing
-    Image string `json:"name,string"`
+    Image string `json:"image,omitempty"`
     
     // Command for image container
     Command []string `json:"command,omitempty"`
     
     // Args for image container
-    Args []string `json:"args,omitempty" 
+    Args []string `json:"args,omitempty"`
 }
 ```
 
@@ -163,15 +180,15 @@ Fluid  对于 Cache Runtime 的 Reconcile flow 如下图最左侧所示：
 
 Cache Runtime 中对缓存系统的各个组件（Master/Worker/Client Component）抽象了 ComponentHelper 接口，其接口定义如下:
 
-- 对于 Component 的销毁，采用 OwnererReference 进行管理，因此不用定义接口。
+- 对于 Component 的销毁，采用 OwnerReference 进行管理，因此不用定义接口。
 
 ```go
 type ComponentHelper interface {
     // reconcile to create component workload
 	Reconciler(ctx context.Context, component *common.CacheRuntimeComponentValue) error
-    // create RuntimeComponentStatus accoring to component workload status
+    // create RuntimeComponentStatus according to component workload status
 	ConstructComponentStatus(ctx context.Context, component *common.CacheRuntimeComponentValue) (datav1alpha1.RuntimeComponentStatus, error)
-    // get TopologyConfig accoring to component workload spec, will be recorded in the Runtime ConfigMap
+    // get TopologyConfig according to component workload spec, will be recorded in the Runtime ConfigMap
 	GetComponentTopologyInfo(ctx context.Context, component *common.CacheRuntimeComponentValue) (common.TopologyConfig, error)
     // check component exist or not, currently useless
 	CheckComponentExist(ctx context.Context, component *common.CacheRuntimeComponentValue) (bool, error)
