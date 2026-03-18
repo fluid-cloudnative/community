@@ -30,7 +30,7 @@ Curvine 是 Master-Worker 架构，其示例配置如下：
 [master]
 meta_dir = "testing/meta"
 
-# masta HA raft configuration.
+# master HA raft configuration.
 [journal]
 journal_addrs = [
     {id = 1, hostname = "master-sts-0.master-sts-svc", port = 8996}
@@ -59,9 +59,9 @@ mnt_path = "/runtime-mnt/fuse"
 /app/curvine/lib/curvine-fuse --conf curvine-cluster.toml
 ```
 
-Curvine 挂载底层文件文件时，需要等缓存系统启动完成后，显式通过命令`cv mount`执行。
+Curvine 挂载底层文件系统时，需要等缓存系统启动完成后，显式通过命令`cv mount`执行。
 
-### 1.2 扩展 CaceRuntime 的流程定义
+### 1.2 扩展 CacheRuntime 的流程定义
 
 Curvine Cache Runtime 中在 SetUp 阶段相关的处理流程如下图所示：
 
@@ -82,7 +82,7 @@ type CacheRuntimeClass struct {
 }
 type ExecutionEntries struct { 
     // 挂载 UFS 的操作，针对 Master-Slave 架构，需要在 Master 中执行
-    MountUfs *ExecutionCommonEntry  `json:"mountUfs,omitempty"`
+	MountUFS *ExecutionCommonEntry  `json:"mountUFS,omitempty"`
     
     // 获取缓存信息的操作，如缓存总容量、已使用容量等（Fluid 定义输出格式），针对所有架构的缓存系统
     ReportSummary *ExecutionCommonEntry `json:"reportSummary,omitempty"`
@@ -124,7 +124,7 @@ type ExecutionCommonEntry struct {
 ```go
 type CacheRuntimeClass struct {
     // 当前 Cache System 支持哪些数据操作
-    DataOperation	[]DataOperationSpec `json:"dataOperationSpec,omitempty"`
+    DataOperations []DataOperationSpec `json:"dataOperations,omitempty"`
 }
 
 type DataOperationSpec struct {
@@ -153,7 +153,7 @@ type DataOperator interface {
 
 为了保证与 TemplateEngine 的状态及处理逻辑一致，仍使用五种状态（None/Pending/Executing/Complete/Failed），其状态转换逻辑如下：
 
-<img src="pics/state_transform.jpeg" alt="img" style="zoom:80%;" />
+  <img src="./pics/state_transform.jpeg" alt="img" width="80%" />
 
 在核心实现上，与 TemplateEngine 的不同点在于 Executing 阶段 Helm 所用的文件的生成，即需要实现接口
 
@@ -170,7 +170,7 @@ type DataOperatorYamlGenerator interface {
 
 
 
-### 3. 支持 In-Place Upgrade 和 ReBuild
+### 3. 支持 In-Place Upgrade 和 Rebuild
 
 Fluid 准备采用类似 OpenKruise 中的 AdvancedStatefulSet 的能力替代现有 Cache Runtime 的 StatefulSet，AdvancedStatefulSet 自身具备原地升级的能力，因此本项工作的内容，是结合 Cache Runtime 的生命周期，梳理相关的改动点，并实现支持原地升级和缓存重建的能力。
 
